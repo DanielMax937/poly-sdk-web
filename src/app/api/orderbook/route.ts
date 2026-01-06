@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSDK } from '@/lib/sdk';
+import { clobApi, processOrderbook } from '@/lib/sdk';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,26 +18,22 @@ const mockOrderbook = {
 };
 
 export async function GET(request: NextRequest) {
-    const sdk = getSDK();
     const searchParams = request.nextUrl.searchParams;
-
     const conditionId = searchParams.get('conditionId');
 
     if (!conditionId) {
-        return NextResponse.json(
-            { error: 'conditionId is required' },
-            { status: 400 }
-        );
+        return NextResponse.json({ error: 'conditionId is required' }, { status: 400 });
     }
 
     try {
-        const orderbook = await sdk.getOrderbook(conditionId);
+        const books = await clobApi.getMarketOrderbook(conditionId);
+        if (!books) {
+            return NextResponse.json({ orderbook: mockOrderbook, _mock: true });
+        }
+        const orderbook = processOrderbook(books.yes, books.no);
         return NextResponse.json({ orderbook });
     } catch (error) {
         console.error('Orderbook API error:', error);
-        return NextResponse.json({
-            orderbook: mockOrderbook,
-            _mock: true
-        });
+        return NextResponse.json({ orderbook: mockOrderbook, _mock: true });
     }
 }

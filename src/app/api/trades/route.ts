@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSDK } from '@/lib/sdk';
+import { dataApi, Trade } from '@/lib/sdk';
 
 export const dynamic = 'force-dynamic';
 
-const mockTrades = [
+const mockTrades: Trade[] = [
     { price: 0.65, size: 100, side: 'BUY', timestamp: Date.now() - 60000, outcomeIndex: 0, outcome: 'Yes', proxyWallet: '0xabc123' },
     { price: 0.64, size: 50, side: 'SELL', timestamp: Date.now() - 120000, outcomeIndex: 0, outcome: 'Yes', proxyWallet: '0xdef456' },
     { price: 0.35, size: 75, side: 'BUY', timestamp: Date.now() - 180000, outcomeIndex: 1, outcome: 'No', proxyWallet: '0xghi789' },
@@ -12,23 +12,21 @@ const mockTrades = [
 ];
 
 export async function GET(request: NextRequest) {
-    const sdk = getSDK();
     const searchParams = request.nextUrl.searchParams;
-
     const market = searchParams.get('market');
     const limit = parseInt(searchParams.get('limit') || '500');
 
     try {
         if (market) {
             try {
-                const trades = await sdk.dataApi.getTradesByMarket(market, limit);
+                const trades = await dataApi.getTradesByMarket(market, limit);
                 return NextResponse.json({ trades });
             } catch {
                 return NextResponse.json({ trades: mockTrades, _mock: true });
             }
         } else {
             try {
-                const trades = await sdk.dataApi.getTrades({ limit });
+                const trades = await dataApi.getTrades({ limit });
                 return NextResponse.json({ trades });
             } catch {
                 return NextResponse.json({ trades: mockTrades, _mock: true });

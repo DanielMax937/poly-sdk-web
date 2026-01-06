@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSDK } from '@/lib/sdk';
+import { dataApi, Position } from '@/lib/sdk';
 
 export const dynamic = 'force-dynamic';
 
-const mockPositions = [
+const mockPositions: Position[] = [
     { conditionId: '0x123', title: 'Will BTC reach $100k?', outcome: 'Yes', size: 150, avgPrice: 0.55, curPrice: 0.65, cashPnl: 15, percentPnl: 18 },
     { conditionId: '0x456', title: 'Will ETH flip BTC?', outcome: 'No', size: 80, avgPrice: 0.80, curPrice: 0.85, cashPnl: 4, percentPnl: 6 },
 ];
@@ -22,48 +22,36 @@ const mockProfile = {
 };
 
 export async function GET(request: NextRequest) {
-    const sdk = getSDK();
     const searchParams = request.nextUrl.searchParams;
-
     const address = searchParams.get('address');
     const type = searchParams.get('type') || 'positions';
     const limit = parseInt(searchParams.get('limit') || '20');
 
     if (!address) {
-        return NextResponse.json(
-            { error: 'address is required' },
-            { status: 400 }
-        );
+        return NextResponse.json({ error: 'address is required' }, { status: 400 });
     }
 
     try {
         if (type === 'positions') {
             try {
-                const positions = await sdk.dataApi.getPositions(address, { limit });
+                const positions = await dataApi.getPositions(address, { limit });
                 return NextResponse.json({ positions });
             } catch {
                 return NextResponse.json({ positions: mockPositions, _mock: true });
             }
         } else if (type === 'activity') {
             try {
-                const activity = await sdk.dataApi.getActivity(address, { limit });
+                const activity = await dataApi.getActivity(address, { limit });
                 return NextResponse.json({ activity });
             } catch {
                 return NextResponse.json({ activity: mockActivity, _mock: true });
             }
         } else if (type === 'profile') {
-            try {
-                const profile = await sdk.wallets.getWalletProfile(address);
-                return NextResponse.json({ profile });
-            } catch {
-                return NextResponse.json({ profile: { ...mockProfile, address }, _mock: true });
-            }
+            // Profile endpoint - use mock data as fallback
+            return NextResponse.json({ profile: { ...mockProfile, address }, _mock: true });
         }
 
-        return NextResponse.json(
-            { error: 'Invalid type parameter' },
-            { status: 400 }
-        );
+        return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 });
     } catch (error) {
         console.error('Wallet API error:', error);
         return NextResponse.json({ positions: mockPositions, _mock: true });
