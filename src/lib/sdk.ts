@@ -12,6 +12,8 @@ const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
 const DATA_API_BASE = 'https://data-api.polymarket.com';
 const CLOB_API_BASE = 'https://clob.polymarket.com';
 
+import { proxyFetch } from './proxy-fetch';
+
 // Types
 export interface GammaMarket {
   id: string;
@@ -122,7 +124,7 @@ export const gammaApi = {
    */
   async checkStatus(): Promise<boolean> {
     try {
-      const res = await fetch(`${GAMMA_API_BASE}/status`);
+      const res = await proxyFetch(`${GAMMA_API_BASE}/status`);
       return res.ok;
     } catch {
       return false;
@@ -134,7 +136,7 @@ export const gammaApi = {
    */
   async getTrendingMarkets(limit = 20): Promise<GammaMarket[]> {
     const url = `${GAMMA_API_BASE}/markets?limit=${limit}&active=true&closed=false&order=volume24hr&ascending=false`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return (data || []).map((m: Record<string, unknown>) => normalizeGammaMarket(m));
@@ -162,7 +164,7 @@ export const gammaApi = {
     if (params.tag_slug) queryParams.set('tag_slug', params.tag_slug);
 
     const url = `${GAMMA_API_BASE}/markets?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return (data || []).map((m: Record<string, unknown>) => normalizeGammaMarket(m));
@@ -173,7 +175,7 @@ export const gammaApi = {
    */
   async getMarketById(id: string): Promise<GammaMarket | null> {
     const url = `${GAMMA_API_BASE}/markets/${id}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) {
       if (res.status === 404) return null;
       throw new Error(`Gamma API error: ${res.status}`);
@@ -187,7 +189,7 @@ export const gammaApi = {
    */
   async getMarketByConditionId(conditionId: string): Promise<GammaMarket | null> {
     const url = `${GAMMA_API_BASE}/markets?conditionId=${conditionId}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return data.length > 0 ? normalizeGammaMarket(data[0]) : null;
@@ -198,7 +200,7 @@ export const gammaApi = {
    */
   async getMarketBySlug(slug: string): Promise<GammaMarket | null> {
     const url = `${GAMMA_API_BASE}/markets?slug=${slug}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return data.length > 0 ? normalizeGammaMarket(data[0]) : null;
@@ -224,7 +226,7 @@ export const gammaApi = {
     if (params.ascending !== undefined) queryParams.set('ascending', String(params.ascending));
 
     const url = `${GAMMA_API_BASE}/events?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return (data || []).map((e: Record<string, unknown>) => normalizeGammaEvent(e));
@@ -235,7 +237,7 @@ export const gammaApi = {
    */
   async getEventById(id: string): Promise<GammaEvent | null> {
     const url = `${GAMMA_API_BASE}/events/${id}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) {
       if (res.status === 404) return null;
       throw new Error(`Gamma API error: ${res.status}`);
@@ -253,7 +255,7 @@ export const gammaApi = {
     if (params.offset) queryParams.set('offset', String(params.offset));
 
     const url = `${GAMMA_API_BASE}/tags?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const res = await proxyFetch(url, { next: { revalidate: 300 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return (data || []).map((t: Record<string, unknown>) => ({
@@ -271,7 +273,7 @@ export const gammaApi = {
     events: GammaEvent[];
   }> {
     const url = `${GAMMA_API_BASE}/public-search?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return {
@@ -392,7 +394,7 @@ export const dataApi = {
   async getLeaderboard(params: { limit?: number; timePeriod?: string } = {}): Promise<{ entries: LeaderboardEntry[] }> {
     const { limit = 10, timePeriod = 'ALL' } = params;
     const url = `${DATA_API_BASE}/leaderboard?limit=${limit}&window=${timePeriod.toLowerCase()}`;
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const res = await proxyFetch(url, { next: { revalidate: 300 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
 
@@ -437,7 +439,7 @@ export const dataApi = {
     if (params.sortDirection) queryParams.set('sortDirection', params.sortDirection);
 
     const url = `${DATA_API_BASE}/positions?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
 
@@ -493,7 +495,7 @@ export const dataApi = {
     if (params.sortDirection) queryParams.set('sortDirection', params.sortDirection);
 
     const url = `${DATA_API_BASE}/activity?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
 
@@ -528,7 +530,7 @@ export const dataApi = {
     if (params.minBalance) queryParams.set('minBalance', String(params.minBalance));
 
     const url = `${DATA_API_BASE}/holders?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
 
@@ -554,7 +556,7 @@ export const dataApi = {
     if (market) queryParams.set('market', market);
 
     const url = `${DATA_API_BASE}/value?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
 
@@ -570,7 +572,7 @@ export const dataApi = {
   async getTrades(params: { limit?: number } = {}): Promise<Trade[]> {
     const { limit = 100 } = params;
     const url = `${DATA_API_BASE}/trades?limit=${limit}`;
-    const res = await fetch(url, { next: { revalidate: 30 } });
+    const res = await proxyFetch(url, { next: { revalidate: 30 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
     return normalizeTrades(data.trades || data || []);
@@ -581,7 +583,7 @@ export const dataApi = {
    */
   async getTradesByMarket(conditionId: string, limit = 500): Promise<Trade[]> {
     const url = `${DATA_API_BASE}/trades?market=${conditionId}&limit=${limit}`;
-    const res = await fetch(url, { next: { revalidate: 30 } });
+    const res = await proxyFetch(url, { next: { revalidate: 30 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
     return normalizeTrades(data.trades || data || []);
@@ -626,7 +628,7 @@ export const clobApi = {
    */
   async getOrderbook(tokenId: string): Promise<Orderbook> {
     const url = `${CLOB_API_BASE}/book?token_id=${tokenId}`;
-    const res = await fetch(url, { next: { revalidate: 10 } });
+    const res = await proxyFetch(url, { next: { revalidate: 10 } });
     if (!res.ok) throw new Error(`CLOB API error: ${res.status}`);
     return res.json();
   },
@@ -668,7 +670,7 @@ export const clobApi = {
     if (params.fidelity) queryParams.set('fidelity', String(params.fidelity));
 
     const url = `${CLOB_API_BASE}/prices-history?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`CLOB API error: ${res.status}`);
     return res.json();
   },
@@ -685,7 +687,7 @@ export const clobApi = {
     if (params.makerAddress) queryParams.set('maker_address', params.makerAddress);
 
     const url = `${CLOB_API_BASE}/data/trades?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 30 } });
+    const res = await proxyFetch(url, { next: { revalidate: 30 } });
     if (!res.ok) throw new Error(`CLOB API error: ${res.status}`);
     const data = await res.json();
     return normalizeTrades(data.trades || data || []);
@@ -700,7 +702,7 @@ export const clobApi = {
       ...(side && { side }),
     }));
 
-    const res = await fetch(`${CLOB_API_BASE}/spreads`, {
+    const res = await proxyFetch(`${CLOB_API_BASE}/spreads`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -715,7 +717,7 @@ export const clobApi = {
    */
   async getMarketInfo(conditionId: string): Promise<ClobMarketInfo | null> {
     const url = `${CLOB_API_BASE}/markets/${conditionId}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) {
       if (res.status === 404) return null;
       throw new Error(`CLOB API error: ${res.status}`);
@@ -733,7 +735,7 @@ export const clobApi = {
     if (params.nextCursor) queryParams.set('next_cursor', params.nextCursor);
 
     const url = `${CLOB_API_BASE}/markets?${queryParams.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`CLOB API error: ${res.status}`);
     return res.json();
   },

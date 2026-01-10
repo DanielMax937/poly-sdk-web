@@ -12,7 +12,10 @@
     "@polymarket/clob-client": "^5.2.0",
     "chart.js": "^4.5.1",
     "ethers": "^5.8.0",
+    "https-proxy-agent": "^7.0.6",
     "next": "16.1.1",
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.57.0",
     "react": "19.2.3",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.3"
