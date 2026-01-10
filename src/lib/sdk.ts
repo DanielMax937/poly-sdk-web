@@ -3,7 +3,7 @@
  * Uses the APIs directly instead of the poly-sdk package
  * 
  * API Endpoints:
- * - Gamma API: https://gamma-api.polymarket.com (market discovery, events)
+ * - Gamma API: https://gamma-api.polymarket.com (markets, events, tags, search)
  * - Data API: https://data-api.polymarket.com (positions, trades, leaderboard)
  * - CLOB API: https://clob.polymarket.com (orderbook, trading)
  */
@@ -15,13 +15,15 @@ const CLOB_API_BASE = 'https://clob.polymarket.com';
 // Types
 export interface GammaMarket {
   id: string;
-  condition_id: string;
-  question_id: string;
+  conditionId: string;
+  questionID: string;
   question: string;
   slug: string;
   volume: number;
+  volumeNum: number;
   volume24hr: number;
   liquidity: number;
+  liquidityNum: number;
   startDate: string;
   endDate: string;
   outcomes: string[];
@@ -30,6 +32,30 @@ export interface GammaMarket {
   active: boolean;
   closed: boolean;
   archived: boolean;
+  bestBid?: number;
+  bestAsk?: number;
+  spread?: number;
+}
+
+export interface GammaEvent {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  volume: number;
+  volume24hr: number;
+  liquidity: number;
+  active: boolean;
+  closed: boolean;
+  markets: GammaMarket[];
+}
+
+export interface GammaTag {
+  id: string;
+  label: string;
+  slug: string;
 }
 
 export interface LeaderboardEntry {
@@ -78,24 +104,98 @@ export interface Orderbook {
   asset_id: string;
 }
 
+// Helper to parse JSON string fields from API
+function parseJsonString<T>(value: unknown, defaultValue: T): T {
+  if (!value) return defaultValue;
+  if (typeof value !== 'string') return value as T;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return defaultValue;
+  }
+}
+
 // Gamma API Client
 export const gammaApi = {
+  /**
+   * Check API health status
+   */
+  async checkStatus(): Promise<boolean> {
+    try {
+      const res = await fetch(`${GAMMA_API_BASE}/status`);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Get trending markets sorted by 24h volume
+   */
   async getTrendingMarkets(limit = 20): Promise<GammaMarket[]> {
     const url = `${GAMMA_API_BASE}/markets?limit=${limit}&active=true&closed=false&order=volume24hr&ascending=false`;
     const res = await fetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
-    return data.map((m: Record<string, unknown>) => normalizeGammaMarket(m));
+    return (data || []).map((m: Record<string, unknown>) => normalizeGammaMarket(m));
   },
 
-  async getMarket(conditionId: string): Promise<GammaMarket | null> {
-    const url = `${GAMMA_API_BASE}/markets?condition_id=${conditionId}`;
+  /**
+   * Get markets with custom filters
+   */
+  async getMarkets(params: {
+    limit?: number;
+    offset?: number;
+    active?: boolean;
+    closed?: boolean;
+    order?: string;
+    ascending?: boolean;
+    tag_slug?: string;
+  } = {}): Promise<GammaMarket[]> {
+    const queryParams = new URLSearchParams();
+    if (params.limit) queryParams.set('limit', String(params.limit));
+    if (params.offset) queryParams.set('offset', String(params.offset));
+    if (params.active !== undefined) queryParams.set('active', String(params.active));
+    if (params.closed !== undefined) queryParams.set('closed', String(params.closed));
+    if (params.order) queryParams.set('order', params.order);
+    if (params.ascending !== undefined) queryParams.set('ascending', String(params.ascending));
+    if (params.tag_slug) queryParams.set('tag_slug', params.tag_slug);
+
+    const url = `${GAMMA_API_BASE}/markets?${queryParams.toString()}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
+    const data = await res.json();
+    return (data || []).map((m: Record<string, unknown>) => normalizeGammaMarket(m));
+  },
+
+  /**
+   * Get market by ID
+   */
+  async getMarketById(id: string): Promise<GammaMarket | null> {
+    const url = `${GAMMA_API_BASE}/markets/${id}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error(`Gamma API error: ${res.status}`);
+    }
+    const data = await res.json();
+    return normalizeGammaMarket(data);
+  },
+
+  /**
+   * Get market by condition ID (query parameter)
+   */
+  async getMarketByConditionId(conditionId: string): Promise<GammaMarket | null> {
+    const url = `${GAMMA_API_BASE}/markets?conditionId=${conditionId}`;
     const res = await fetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return data.length > 0 ? normalizeGammaMarket(data[0]) : null;
   },
 
+  /**
+   * Get market by slug
+   */
   async getMarketBySlug(slug: string): Promise<GammaMarket | null> {
     const url = `${GAMMA_API_BASE}/markets?slug=${slug}`;
     const res = await fetch(url, { next: { revalidate: 60 } });
@@ -103,53 +203,192 @@ export const gammaApi = {
     const data = await res.json();
     return data.length > 0 ? normalizeGammaMarket(data[0]) : null;
   },
+
+  /**
+   * Get events (contains markets)
+   */
+  async getEvents(params: {
+    limit?: number;
+    offset?: number;
+    active?: boolean;
+    closed?: boolean;
+    order?: string;
+    ascending?: boolean;
+  } = {}): Promise<GammaEvent[]> {
+    const queryParams = new URLSearchParams();
+    if (params.limit) queryParams.set('limit', String(params.limit));
+    if (params.offset) queryParams.set('offset', String(params.offset));
+    if (params.active !== undefined) queryParams.set('active', String(params.active));
+    if (params.closed !== undefined) queryParams.set('closed', String(params.closed));
+    if (params.order) queryParams.set('order', params.order);
+    if (params.ascending !== undefined) queryParams.set('ascending', String(params.ascending));
+
+    const url = `${GAMMA_API_BASE}/events?${queryParams.toString()}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
+    const data = await res.json();
+    return (data || []).map((e: Record<string, unknown>) => normalizeGammaEvent(e));
+  },
+
+  /**
+   * Get event by ID
+   */
+  async getEventById(id: string): Promise<GammaEvent | null> {
+    const url = `${GAMMA_API_BASE}/events/${id}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error(`Gamma API error: ${res.status}`);
+    }
+    const data = await res.json();
+    return normalizeGammaEvent(data);
+  },
+
+  /**
+   * Get all tags
+   */
+  async getTags(params: { limit?: number; offset?: number } = {}): Promise<GammaTag[]> {
+    const queryParams = new URLSearchParams();
+    if (params.limit) queryParams.set('limit', String(params.limit));
+    if (params.offset) queryParams.set('offset', String(params.offset));
+
+    const url = `${GAMMA_API_BASE}/tags?${queryParams.toString()}`;
+    const res = await fetch(url, { next: { revalidate: 300 } });
+    if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
+    const data = await res.json();
+    return (data || []).map((t: Record<string, unknown>) => ({
+      id: String(t.id || ''),
+      label: String(t.label || ''),
+      slug: String(t.slug || ''),
+    }));
+  },
+
+  /**
+   * Search markets, events, and profiles
+   */
+  async search(query: string): Promise<{
+    markets: GammaMarket[];
+    events: GammaEvent[];
+  }> {
+    const url = `${GAMMA_API_BASE}/public-search?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
+    const data = await res.json();
+    return {
+      markets: (data.markets || []).map((m: Record<string, unknown>) => normalizeGammaMarket(m)),
+      events: (data.events || []).map((e: Record<string, unknown>) => normalizeGammaEvent(e)),
+    };
+  },
 };
 
 function normalizeGammaMarket(m: Record<string, unknown>): GammaMarket {
-  const outcomePricesRaw = m.outcomePrices || m.outcome_prices || '["0.5", "0.5"]';
-  let outcomePrices: string[];
-  try {
-    outcomePrices = typeof outcomePricesRaw === 'string'
-      ? JSON.parse(outcomePricesRaw)
-      : outcomePricesRaw as string[];
-  } catch {
-    outcomePrices = ['0.5', '0.5'];
-  }
-
-  const clobTokenIdsRaw = m.clobTokenIds || m.clob_token_ids;
-  let clobTokenIds: string[] | undefined;
-  if (clobTokenIdsRaw) {
-    try {
-      clobTokenIds = typeof clobTokenIdsRaw === 'string'
-        ? JSON.parse(clobTokenIdsRaw)
-        : clobTokenIdsRaw as string[];
-    } catch {
-      clobTokenIds = undefined;
-    }
-  }
+  // Parse JSON string fields
+  const outcomes = parseJsonString<string[]>(m.outcomes, ['Yes', 'No']);
+  const outcomePrices = parseJsonString<string[]>(m.outcomePrices, ['0.5', '0.5']);
+  const clobTokenIds = parseJsonString<string[] | undefined>(m.clobTokenIds, undefined);
 
   return {
     id: String(m.id || ''),
-    condition_id: String(m.condition_id || m.conditionId || ''),
-    question_id: String(m.question_id || m.questionId || ''),
+    conditionId: String(m.conditionId || m.condition_id || ''),
+    questionID: String(m.questionID || m.question_id || ''),
     question: String(m.question || ''),
     slug: String(m.slug || ''),
-    volume: Number(m.volume || 0),
-    volume24hr: Number(m.volume24hr || m.volume_24hr || 0),
-    liquidity: Number(m.liquidity || 0),
-    startDate: String(m.startDate || m.start_date || ''),
-    endDate: String(m.endDate || m.end_date || ''),
-    outcomes: (m.outcomes as string[]) || ['Yes', 'No'],
+    volume: Number(m.volume || m.volumeNum || 0),
+    volumeNum: Number(m.volumeNum || m.volume || 0),
+    volume24hr: Number(m.volume24hr || 0),
+    liquidity: Number(m.liquidity || m.liquidityNum || 0),
+    liquidityNum: Number(m.liquidityNum || m.liquidity || 0),
+    startDate: String(m.startDate || m.startDateIso || ''),
+    endDate: String(m.endDate || m.endDateIso || ''),
+    outcomes,
     outcomePrices,
     clobTokenIds,
     active: Boolean(m.active),
     closed: Boolean(m.closed),
     archived: Boolean(m.archived),
+    bestBid: m.bestBid !== undefined ? Number(m.bestBid) : undefined,
+    bestAsk: m.bestAsk !== undefined ? Number(m.bestAsk) : undefined,
+    spread: m.spread !== undefined ? Number(m.spread) : undefined,
+  };
+}
+
+function normalizeGammaEvent(e: Record<string, unknown>): GammaEvent {
+  const marketsRaw = e.markets as Record<string, unknown>[] || [];
+
+  return {
+    id: String(e.id || ''),
+    slug: String(e.slug || ''),
+    title: String(e.title || ''),
+    description: String(e.description || ''),
+    startDate: String(e.startDate || ''),
+    endDate: String(e.endDate || ''),
+    volume: Number(e.volume || 0),
+    volume24hr: Number(e.volume24hr || 0),
+    liquidity: Number(e.liquidity || 0),
+    active: Boolean(e.active),
+    closed: Boolean(e.closed),
+    markets: marketsRaw.map((m) => normalizeGammaMarket(m)),
   };
 }
 
 // Data API Client
+export interface DataPosition {
+  proxyWallet: string;
+  asset: string;
+  conditionId: string;
+  size: number;
+  avgPrice: number;
+  initialValue: number;
+  currentValue: number;
+  cashPnl: number;
+  percentPnl: number;
+  realizedPnl: number;
+  percentRealizedPnl: number;
+  curPrice: number;
+  redeemable: boolean;
+  mergeable: boolean;
+  title: string;
+  slug: string;
+  outcome: string;
+  outcomeIndex: number;
+  negativeRisk: boolean;
+}
+
+export interface Activity {
+  proxyWallet: string;
+  timestamp: number;
+  conditionId: string;
+  type: 'TRADE' | 'SPLIT' | 'MERGE' | 'REDEEM' | 'REWARD' | 'CONVERSION' | 'MAKER_REBATE';
+  size: number;
+  usdcSize: number;
+  transactionHash: string;
+  price: number;
+  asset: string;
+  side: 'BUY' | 'SELL';
+  outcomeIndex: number;
+  title: string;
+  slug: string;
+  outcome: string;
+}
+
+export interface DataHolder {
+  proxyWallet: string;
+  amount: number;
+  name?: string;
+  pseudonym?: string;
+  profileImage?: string;
+  outcomeIndex: number;
+}
+
+export interface HoldingsValue {
+  user: string;
+  value: number;
+}
+
 export const dataApi = {
+  /**
+   * Get leaderboard
+   */
   async getLeaderboard(params: { limit?: number; timePeriod?: string } = {}): Promise<{ entries: LeaderboardEntry[] }> {
     const { limit = 10, timePeriod = 'ALL' } = params;
     const url = `${DATA_API_BASE}/leaderboard?limit=${limit}&window=${timePeriod.toLowerCase()}`;
@@ -171,43 +410,163 @@ export const dataApi = {
     return { entries };
   },
 
-  async getPositions(address: string, params: { limit?: number } = {}): Promise<Position[]> {
-    const { limit = 20 } = params;
-    const url = `${DATA_API_BASE}/positions?user=${address}&limit=${limit}&sizeThreshold=0.1`;
+  /**
+   * Get user positions
+   */
+  async getPositions(address: string, params: {
+    market?: string;
+    eventId?: string;
+    sizeThreshold?: number;
+    redeemable?: boolean;
+    mergeable?: boolean;
+    limit?: number;
+    offset?: number;
+    sortBy?: 'CURRENT' | 'INITIAL' | 'TOKENS' | 'CASHPNL' | 'PERCENTPNL' | 'TITLE' | 'RESOLVING' | 'PRICE' | 'AVGPRICE';
+    sortDirection?: 'ASC' | 'DESC';
+  } = {}): Promise<DataPosition[]> {
+    const queryParams = new URLSearchParams();
+    queryParams.set('user', address);
+    if (params.market) queryParams.set('market', params.market);
+    if (params.eventId) queryParams.set('eventId', params.eventId);
+    if (params.sizeThreshold !== undefined) queryParams.set('sizeThreshold', String(params.sizeThreshold));
+    if (params.redeemable !== undefined) queryParams.set('redeemable', String(params.redeemable));
+    if (params.mergeable !== undefined) queryParams.set('mergeable', String(params.mergeable));
+    if (params.limit) queryParams.set('limit', String(params.limit));
+    if (params.offset) queryParams.set('offset', String(params.offset));
+    if (params.sortBy) queryParams.set('sortBy', params.sortBy);
+    if (params.sortDirection) queryParams.set('sortDirection', params.sortDirection);
+
+    const url = `${DATA_API_BASE}/positions?${queryParams.toString()}`;
     const res = await fetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
 
-    return (data.positions || data || []).map((p: Record<string, unknown>) => ({
-      conditionId: String(p.conditionId || p.condition_id || ''),
-      title: String(p.title || p.question || ''),
-      outcome: String(p.outcome || (p.outcomeIndex === 0 ? 'Yes' : 'No')),
+    return (data || []).map((p: Record<string, unknown>) => ({
+      proxyWallet: String(p.proxyWallet || ''),
+      asset: String(p.asset || ''),
+      conditionId: String(p.conditionId || ''),
       size: Number(p.size || 0),
-      avgPrice: Number(p.avgPrice || p.avg_price || 0),
-      curPrice: Number(p.curPrice || p.current_price) || undefined,
-      cashPnl: Number(p.cashPnl || p.pnl) || undefined,
-      percentPnl: Number(p.percentPnl || p.percent_pnl) || undefined,
+      avgPrice: Number(p.avgPrice || 0),
+      initialValue: Number(p.initialValue || 0),
+      currentValue: Number(p.currentValue || 0),
+      cashPnl: Number(p.cashPnl || 0),
+      percentPnl: Number(p.percentPnl || 0),
+      realizedPnl: Number(p.realizedPnl || 0),
+      percentRealizedPnl: Number(p.percentRealizedPnl || 0),
+      curPrice: Number(p.curPrice || 0),
+      redeemable: Boolean(p.redeemable),
+      mergeable: Boolean(p.mergeable),
+      title: String(p.title || ''),
+      slug: String(p.slug || ''),
+      outcome: String(p.outcome || ''),
+      outcomeIndex: Number(p.outcomeIndex || 0),
+      negativeRisk: Boolean(p.negativeRisk),
     }));
   },
 
-  async getActivity(address: string, params: { limit?: number } = {}): Promise<Record<string, unknown>[]> {
-    const { limit = 20 } = params;
-    const url = `${DATA_API_BASE}/activity?user=${address}&limit=${limit}`;
+  /**
+   * Get user on-chain activity
+   */
+  async getActivity(address: string, params: {
+    market?: string;
+    eventId?: string;
+    type?: 'TRADE' | 'SPLIT' | 'MERGE' | 'REDEEM' | 'REWARD' | 'CONVERSION' | 'MAKER_REBATE';
+    side?: 'BUY' | 'SELL';
+    start?: number;
+    end?: number;
+    limit?: number;
+    offset?: number;
+    sortBy?: 'TIMESTAMP' | 'TOKENS' | 'CASH';
+    sortDirection?: 'ASC' | 'DESC';
+  } = {}): Promise<Activity[]> {
+    const queryParams = new URLSearchParams();
+    queryParams.set('user', address);
+    if (params.market) queryParams.set('market', params.market);
+    if (params.eventId) queryParams.set('eventId', params.eventId);
+    if (params.type) queryParams.set('type', params.type);
+    if (params.side) queryParams.set('side', params.side);
+    if (params.start) queryParams.set('start', String(params.start));
+    if (params.end) queryParams.set('end', String(params.end));
+    if (params.limit) queryParams.set('limit', String(params.limit));
+    if (params.offset) queryParams.set('offset', String(params.offset));
+    if (params.sortBy) queryParams.set('sortBy', params.sortBy);
+    if (params.sortDirection) queryParams.set('sortDirection', params.sortDirection);
+
+    const url = `${DATA_API_BASE}/activity?${queryParams.toString()}`;
     const res = await fetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
 
-    return (data.activity || data || []).map((a: Record<string, unknown>) => ({
-      type: String(a.type || 'TRADE'),
-      side: String(a.side || 'BUY'),
+    return (data || []).map((a: Record<string, unknown>) => ({
+      proxyWallet: String(a.proxyWallet || ''),
+      timestamp: Number(a.timestamp || 0),
+      conditionId: String(a.conditionId || ''),
+      type: (a.type || 'TRADE') as Activity['type'],
       size: Number(a.size || 0),
+      usdcSize: Number(a.usdcSize || 0),
+      transactionHash: String(a.transactionHash || ''),
       price: Number(a.price || 0),
-      usdcSize: Number(a.usdcSize || a.usdc_size) || undefined,
+      asset: String(a.asset || ''),
+      side: (a.side || 'BUY') as 'BUY' | 'SELL',
+      outcomeIndex: Number(a.outcomeIndex || 0),
+      title: String(a.title || ''),
+      slug: String(a.slug || ''),
       outcome: String(a.outcome || ''),
-      timestamp: Number(a.timestamp || Date.now()),
     }));
   },
 
+  /**
+   * Get top holders of a market
+   */
+  async getHolders(conditionId: string, params: {
+    limit?: number;
+    minBalance?: number;
+  } = {}): Promise<{ token: string; holders: DataHolder[] }[]> {
+    const queryParams = new URLSearchParams();
+    queryParams.set('market', conditionId);
+    if (params.limit) queryParams.set('limit', String(Math.min(params.limit, 20)));
+    if (params.minBalance) queryParams.set('minBalance', String(params.minBalance));
+
+    const url = `${DATA_API_BASE}/holders?${queryParams.toString()}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error(`Data API error: ${res.status}`);
+    const data = await res.json();
+
+    return (data || []).map((item: Record<string, unknown>) => ({
+      token: String(item.token || ''),
+      holders: ((item.holders as Record<string, unknown>[]) || []).map((h) => ({
+        proxyWallet: String(h.proxyWallet || ''),
+        amount: Number(h.amount || 0),
+        name: h.name as string | undefined,
+        pseudonym: h.pseudonym as string | undefined,
+        profileImage: h.profileImage as string | undefined,
+        outcomeIndex: Number(h.outcomeIndex || 0),
+      })),
+    }));
+  },
+
+  /**
+   * Get total holdings value for a user
+   */
+  async getHoldingsValue(address: string, market?: string): Promise<HoldingsValue[]> {
+    const queryParams = new URLSearchParams();
+    queryParams.set('user', address);
+    if (market) queryParams.set('market', market);
+
+    const url = `${DATA_API_BASE}/value?${queryParams.toString()}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error(`Data API error: ${res.status}`);
+    const data = await res.json();
+
+    return (data || []).map((v: Record<string, unknown>) => ({
+      user: String(v.user || ''),
+      value: Number(v.value || 0),
+    }));
+  },
+
+  /**
+   * Get trades (deprecated - use CLOB API instead)
+   */
   async getTrades(params: { limit?: number } = {}): Promise<Trade[]> {
     const { limit = 100 } = params;
     const url = `${DATA_API_BASE}/trades?limit=${limit}`;
@@ -217,6 +576,9 @@ export const dataApi = {
     return normalizeTrades(data.trades || data || []);
   },
 
+  /**
+   * Get trades by market (deprecated - use CLOB API instead)
+   */
   async getTradesByMarket(conditionId: string, limit = 500): Promise<Trade[]> {
     const url = `${DATA_API_BASE}/trades?market=${conditionId}&limit=${limit}`;
     const res = await fetch(url, { next: { revalidate: 30 } });
@@ -239,7 +601,29 @@ function normalizeTrades(trades: Record<string, unknown>[]): Trade[] {
 }
 
 // CLOB API Client
+export interface PriceHistoryPoint {
+  t: number; // Unix timestamp
+  p: number; // Price
+}
+
+export interface ClobMarketInfo {
+  condition_id: string;
+  question_id: string;
+  tokens: Array<{
+    token_id: string;
+    outcome: string;
+  }>;
+  active: boolean;
+  closed: boolean;
+  accepting_orders: boolean;
+  minimum_tick_size: number;
+  minimum_order_size: number;
+}
+
 export const clobApi = {
+  /**
+   * Get order book for a token
+   */
   async getOrderbook(tokenId: string): Promise<Orderbook> {
     const url = `${CLOB_API_BASE}/book?token_id=${tokenId}`;
     const res = await fetch(url, { next: { revalidate: 10 } });
@@ -247,9 +631,12 @@ export const clobApi = {
     return res.json();
   },
 
+  /**
+   * Get order book for both outcomes of a market
+   */
   async getMarketOrderbook(conditionId: string): Promise<{ yes: Orderbook; no: Orderbook } | null> {
     // First get market info to get token IDs
-    const market = await gammaApi.getMarket(conditionId);
+    const market = await gammaApi.getMarketByConditionId(conditionId);
     if (!market?.clobTokenIds || market.clobTokenIds.length < 2) {
       return null;
     }
@@ -261,6 +648,94 @@ export const clobApi = {
     ]);
 
     return { yes: yesBook, no: noBook };
+  },
+
+  /**
+   * Get price history for a token
+   */
+  async getPriceHistory(params: {
+    tokenId: string;
+    startTs?: number;
+    endTs?: number;
+    interval?: '1m' | '1h' | '6h' | '1d' | '1w' | 'max';
+    fidelity?: number; // Resolution in minutes
+  }): Promise<{ history: PriceHistoryPoint[] }> {
+    const queryParams = new URLSearchParams();
+    queryParams.set('market', params.tokenId);
+    if (params.startTs) queryParams.set('startTs', String(params.startTs));
+    if (params.endTs) queryParams.set('endTs', String(params.endTs));
+    if (params.interval) queryParams.set('interval', params.interval);
+    if (params.fidelity) queryParams.set('fidelity', String(params.fidelity));
+
+    const url = `${CLOB_API_BASE}/prices-history?${queryParams.toString()}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error(`CLOB API error: ${res.status}`);
+    return res.json();
+  },
+
+  /**
+   * Get trades from CLOB
+   */
+  async getTrades(params: {
+    market?: string;
+    makerAddress?: string;
+  } = {}): Promise<Trade[]> {
+    const queryParams = new URLSearchParams();
+    if (params.market) queryParams.set('market', params.market);
+    if (params.makerAddress) queryParams.set('maker_address', params.makerAddress);
+
+    const url = `${CLOB_API_BASE}/data/trades?${queryParams.toString()}`;
+    const res = await fetch(url, { next: { revalidate: 30 } });
+    if (!res.ok) throw new Error(`CLOB API error: ${res.status}`);
+    const data = await res.json();
+    return normalizeTrades(data.trades || data || []);
+  },
+
+  /**
+   * Get bid-ask spreads for multiple tokens
+   */
+  async getSpreads(tokenIds: string[], side?: 'BUY' | 'SELL'): Promise<Record<string, string>> {
+    const body = tokenIds.map(token_id => ({
+      token_id,
+      ...(side && { side }),
+    }));
+
+    const res = await fetch(`${CLOB_API_BASE}/spreads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      next: { revalidate: 10 },
+    });
+    if (!res.ok) throw new Error(`CLOB API error: ${res.status}`);
+    return res.json();
+  },
+
+  /**
+   * Get CLOB market info
+   */
+  async getMarketInfo(conditionId: string): Promise<ClobMarketInfo | null> {
+    const url = `${CLOB_API_BASE}/markets/${conditionId}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error(`CLOB API error: ${res.status}`);
+    }
+    return res.json();
+  },
+
+  /**
+   * List all CLOB markets
+   */
+  async getMarkets(params: {
+    nextCursor?: string;
+  } = {}): Promise<{ data: ClobMarketInfo[]; next_cursor?: string }> {
+    const queryParams = new URLSearchParams();
+    if (params.nextCursor) queryParams.set('next_cursor', params.nextCursor);
+
+    const url = `${CLOB_API_BASE}/markets?${queryParams.toString()}`;
+    const res = await fetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error(`CLOB API error: ${res.status}`);
+    return res.json();
   },
 };
 
@@ -358,7 +833,7 @@ export async function getUnifiedMarket(identifier: string): Promise<UnifiedMarke
 
   // Try by condition ID first, then by slug
   if (identifier.startsWith('0x')) {
-    market = await gammaApi.getMarket(identifier);
+    market = await gammaApi.getMarketByConditionId(identifier);
   } else {
     market = await gammaApi.getMarketBySlug(identifier);
   }
@@ -368,7 +843,7 @@ export async function getUnifiedMarket(identifier: string): Promise<UnifiedMarke
   const prices = market.outcomePrices.map((p) => parseFloat(p));
 
   return {
-    conditionId: market.condition_id,
+    conditionId: market.conditionId,
     question: market.question,
     slug: market.slug,
     volume: market.volume,

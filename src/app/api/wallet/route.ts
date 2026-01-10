@@ -1,25 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dataApi, Position } from '@/lib/sdk';
+import { dataApi } from '@/lib/sdk';
 
 export const dynamic = 'force-dynamic';
-
-const mockPositions: Position[] = [
-    { conditionId: '0x123', title: 'Will BTC reach $100k?', outcome: 'Yes', size: 150, avgPrice: 0.55, curPrice: 0.65, cashPnl: 15, percentPnl: 18 },
-    { conditionId: '0x456', title: 'Will ETH flip BTC?', outcome: 'No', size: 80, avgPrice: 0.80, curPrice: 0.85, cashPnl: 4, percentPnl: 6 },
-];
-
-const mockActivity = [
-    { type: 'TRADE', side: 'BUY', size: 50, price: 0.55, usdcSize: 27.5, outcome: 'Yes', timestamp: Date.now() - 3600000 },
-    { type: 'TRADE', side: 'SELL', size: 25, price: 0.62, usdcSize: 15.5, outcome: 'Yes', timestamp: Date.now() - 7200000 },
-];
-
-const mockProfile = {
-    address: '0xabc123def456',
-    totalPnL: 12500,
-    smartScore: 78,
-    positionCount: 15,
-    lastActiveAt: new Date().toISOString(),
-};
 
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
@@ -33,27 +15,24 @@ export async function GET(request: NextRequest) {
 
     try {
         if (type === 'positions') {
-            try {
-                const positions = await dataApi.getPositions(address, { limit });
-                return NextResponse.json({ positions });
-            } catch {
-                return NextResponse.json({ positions: mockPositions, _mock: true });
-            }
+            const positions = await dataApi.getPositions(address, { limit });
+            return NextResponse.json({ positions });
         } else if (type === 'activity') {
-            try {
-                const activity = await dataApi.getActivity(address, { limit });
-                return NextResponse.json({ activity });
-            } catch {
-                return NextResponse.json({ activity: mockActivity, _mock: true });
-            }
+            const activity = await dataApi.getActivity(address, { limit });
+            return NextResponse.json({ activity });
         } else if (type === 'profile') {
-            // Profile endpoint - use mock data as fallback
-            return NextResponse.json({ profile: { ...mockProfile, address }, _mock: true });
+            return NextResponse.json(
+                { error: 'Profile endpoint not implemented' },
+                { status: 501 }
+            );
         }
 
         return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 });
     } catch (error) {
         console.error('Wallet API error:', error);
-        return NextResponse.json({ positions: mockPositions, _mock: true });
+        return NextResponse.json(
+            { error: 'Failed to fetch wallet data' },
+            { status: 500 }
+        );
     }
 }

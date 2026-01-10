@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     try {
         const books = await clobApi.getMarketOrderbook(conditionId);
         if (!books) {
-            return NextResponse.json({ arbitrage: null, _mock: true });
+            return NextResponse.json({ error: 'Orderbook not found' }, { status: 404 });
         }
 
         const processed = processOrderbook(books.yes, books.no);
@@ -23,6 +23,9 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ arbitrage });
     } catch (error) {
         console.error('Arbitrage API error:', error);
-        return NextResponse.json({ arbitrage: null, _mock: true });
+        return NextResponse.json(
+            { error: 'Failed to detect arbitrage' },
+            { status: 500 }
+        );
     }
 }

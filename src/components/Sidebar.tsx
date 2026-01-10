@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const demos = [
+    { name: 'API Test', href: '/demos/api-test', icon: '🔌' },
+    { name: 'Orders', href: '/demos/orders', icon: '📝' },
     { name: 'Basic Usage', href: '/demos/basic-usage', icon: '📊' },
     { name: 'Smart Money', href: '/demos/smart-money', icon: '💰' },
     { name: 'Market Analysis', href: '/demos/market-analysis', icon: '📈' },
