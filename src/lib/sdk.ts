@@ -393,7 +393,12 @@ export const dataApi = {
    */
   async getLeaderboard(params: { limit?: number; timePeriod?: string } = {}): Promise<{ entries: LeaderboardEntry[] }> {
     const { limit = 10, timePeriod = 'ALL' } = params;
-    const url = `${DATA_API_BASE}/leaderboard?limit=${limit}&window=${timePeriod.toLowerCase()}`;
+
+    // Map timePeriod to API format (DAY, WEEK, MONTH, ALL)
+    const period = timePeriod.toUpperCase();
+
+    // Use v1 endpoint with correct parameters
+    const url = `${DATA_API_BASE}/v1/leaderboard?category=OVERALL&timePeriod=${period}&orderBy=PNL&limit=${limit}`;
     const res = await proxyFetch(url, { next: { revalidate: 300 } });
     if (!res.ok) throw new Error(`Data API error: ${res.status}`);
     const data = await res.json();
