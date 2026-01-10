@@ -46,11 +46,14 @@ export interface GammaEvent {
   description: string;
   startDate: string;
   endDate: string;
+  image: string;
+  icon: string;
   volume: number;
   volume24hr: number;
   liquidity: number;
   active: boolean;
   closed: boolean;
+  archived: boolean;
   markets: GammaMarket[];
 }
 
@@ -188,7 +191,7 @@ export const gammaApi = {
    * Get market by condition ID (query parameter)
    */
   async getMarketByConditionId(conditionId: string): Promise<GammaMarket | null> {
-    const url = `${GAMMA_API_BASE}/markets?conditionId=${conditionId}`;
+    const url = `${GAMMA_API_BASE}/markets?condition_id=${conditionId}`;
     const res = await proxyFetch(url, { next: { revalidate: 60 } });
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
@@ -204,6 +207,65 @@ export const gammaApi = {
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return data.length > 0 ? normalizeGammaMarket(data[0]) : null;
+  },
+
+  /**
+   * Get event by slug
+   */
+  async getEventBySlug(slug: string): Promise<GammaEvent | null> {
+    const url = `${GAMMA_API_BASE}/events?slug=${slug}`;
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
+    const data = await res.json();
+    if (data.length === 0) return null;
+
+    const event = data[0];
+    return {
+      id: String(event.id || ''),
+      slug: String(event.slug || ''),
+      title: String(event.title || ''),
+      description: String(event.description || ''),
+      startDate: String(event.startDate || ''),
+      endDate: String(event.endDate || ''),
+      image: String(event.image || ''),
+      icon: String(event.icon || ''),
+      active: Boolean(event.active),
+      closed: Boolean(event.closed),
+      archived: Boolean(event.archived),
+      volume: Number(event.volume || 0),
+      liquidity: Number(event.liquidity || 0),
+      markets: (event.markets || []).map((m: any) => normalizeGammaMarket(m)),
+    };
+  },
+
+  /**
+   * Get event by ID
+   */
+  async getEventById(id: string): Promise<GammaEvent | null> {
+    const url = `${GAMMA_API_BASE}/events/${id}`;
+    const res = await proxyFetch(url, { next: { revalidate: 60 } });
+    if (!res.ok) {
+      if (res.status === 404) return null;
+      throw new Error(`Gamma API error: ${res.status}`);
+    }
+    const event = await res.json();
+
+    return {
+      id: String(event.id || ''),
+      slug: String(event.slug || ''),
+      title: String(event.title || ''),
+      description: String(event.description || ''),
+      startDate: String(event.startDate || ''),
+      endDate: String(event.endDate || ''),
+      image: String(event.image || ''),
+      icon: String(event.icon || ''),
+      active: Boolean(event.active),
+      closed: Boolean(event.closed),
+      archived: Boolean(event.archived),
+      volume: Number(event.volume || 0),
+      liquidity: Number(event.liquidity || 0),
+      markets: (event.markets || []).map((m: any) => normalizeGammaMarket(m)),
+    };
   },
 
   /**
@@ -287,7 +349,12 @@ function normalizeGammaMarket(m: Record<string, unknown>): GammaMarket {
   // Parse JSON string fields
   const outcomes = parseJsonString<string[]>(m.outcomes, ['Yes', 'No']);
   const outcomePrices = parseJsonString<string[]>(m.outcomePrices, ['0.5', '0.5']);
-  const clobTokenIds = parseJsonString<string[] | undefined>(m.clobTokenIds, undefined);
+
+  // Try multiple possible field names for clobTokenIds (both camelCase and snake_case)
+  const clobTokenIds = parseJsonString<string[] | undefined>(
+    m.clobTokenIds || m.clob_token_ids,
+    undefined
+  );
 
   return {
     id: String(m.id || ''),
