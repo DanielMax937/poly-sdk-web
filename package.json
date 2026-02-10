@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:no-proxy": "HTTP_PROXY='' next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

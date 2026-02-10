@@ -887,6 +887,108 @@ export function detectArbitrage(processedOrderbook: ReturnType<typeof processOrd
   return null;
 }
 
+// Insider trader detection - looks for unusual orderbook patterns
+export interface InsiderDetection {
+  isInsider: boolean;
+  signals: string[];
+  confidence: 'low' | 'medium' | 'high';
+  details: {
+    largeBidOrder: boolean;
+    largeAskOrder: boolean;
+    orderImbalance: boolean;
+    thinOrderBook: boolean;
+    aggressiveBidding: boolean;
+    largestBidSize?: number;
+    largestAskSize?: number;
+    imbalanceRatio?: number;
+    bidDepth?: number;
+    askDepth?: number;
+  };
+}
+
+export function detectInsiderTrading(
+  processedOrderbook: ReturnType<typeof processOrderbook>,
+  marketVolume24hr?: number
+): InsiderDetection {
+  const signals: string[] = [];
+  const { yes, no, summary } = processedOrderbook;
+
+  // Find largest orders
+  const largestBidSize = Math.max(yes.bidSize, no.bidSize);
+  const largestAskSize = Math.max(yes.askSize, no.askSize);
+
+  // Thresholds based on market size
+  const sizeThreshold = marketVolume24hr && marketVolume24hr > 0
+    ? Math.max(1000, marketVolume24hr * 0.01) // 1% of daily volume or $1000 min
+    : 500; // $500 default for unknown markets
+
+  const depthThreshold = marketVolume24hr && marketVolume24hr > 0
+    ? Math.max(5000, marketVolume24hr * 0.05) // 5% of daily volume
+    : 2000;
+
+  // Signal 1: Large single bid order (potential insider accumulation)
+  const largeBidOrder = largestBidSize > sizeThreshold;
+  if (largeBidOrder) {
+    signals.push(`Large bid order: $${largestBidSize.toFixed(0)} (threshold: $${sizeThreshold.toFixed(0)})`);
+  }
+
+  // Signal 2: Large ask order (potential insider dumping)
+  const largeAskOrder = largestAskSize > sizeThreshold;
+  if (largeAskOrder) {
+    signals.push(`Large ask order: $${largestAskSize.toFixed(0)} (threshold: $${sizeThreshold.toFixed(0)})`);
+  }
+
+  // Signal 3: Severe order imbalance (one-sided betting)
+  const imbalanceRatio = summary.imbalanceRatio;
+  const orderImbalance = imbalanceRatio > 2.5 || imbalanceRatio < 0.4;
+  if (orderImbalance) {
+    signals.push(`Order imbalance: ${imbalanceRatio.toFixed(2)}x (${imbalanceRatio > 1 ? 'bid-heavy' : 'ask-heavy'})`);
+  }
+
+  // Signal 4: Thin order book with large orders (easier to manipulate)
+  const thinOrderBook = summary.totalBidDepth < depthThreshold || summary.totalAskDepth < depthThreshold;
+  if (thinOrderBook && (largeBidOrder || largeAskOrder)) {
+    signals.push(`Thin orderbook: bid depth $${summary.totalBidDepth.toFixed(0)}, ask depth $${summary.totalAskDepth.toFixed(0)}`);
+  }
+
+  // Signal 5: Aggressive bidding (bids much closer to current price than asks)
+  const yesSpread = yes.spread;
+  const noSpread = no.spread;
+  const avgSpread = (yesSpread + noSpread) / 2;
+  const aggressiveBidding = avgSpread < 0.01 && (largeBidOrder || orderImbalance);
+  if (aggressiveBidding) {
+    signals.push(`Aggressive bidding: tight spread (${(avgSpread * 100).toFixed(2)}%) with large orders`);
+  }
+
+  // Calculate confidence based on number and severity of signals
+  let confidence: 'low' | 'medium' | 'high' = 'low';
+  if (signals.length >= 3) confidence = 'high';
+  else if (signals.length >= 2) confidence = 'medium';
+
+  // High confidence overrides
+  if (largeBidOrder && thinOrderBook && imbalanceRatio > 3) confidence = 'high';
+
+  const isInsider = signals.length >= 2 || (signals.length >= 1 && confidence === 'high');
+
+  return {
+    isInsider,
+    signals,
+    confidence,
+    details: {
+      largeBidOrder,
+      largeAskOrder,
+      orderImbalance,
+      thinOrderBook,
+      aggressiveBidding,
+      largestBidSize: largestBidSize || undefined,
+      largestAskSize: largestAskSize || undefined,
+      imbalanceRatio,
+      bidDepth: summary.totalBidDepth,
+      askDepth: summary.totalAskDepth,
+    },
+  };
+}
+
 // Unified market interface
 export interface UnifiedMarket {
   conditionId: string;
