@@ -244,7 +244,18 @@ export async function GET(request: NextRequest) {
                         ...e,
                         markets: e.markets.map(m => ({
                             ...m,
-                            insiderDetection: { isInsider: false, signals: ['Timeout'], confidence: 'low' as const, details: {} },
+                            insiderDetection: {
+                                isInsider: false,
+                                signals: ['Timeout'],
+                                confidence: 'low' as const,
+                                details: {
+                                    largeBidOrder: false,
+                                    largeAskOrder: false,
+                                    orderImbalance: false,
+                                    thinOrderBook: false,
+                                    aggressiveBidding: false
+                                }
+                            },
                         }))
                     }));
                     resolve(result);
@@ -260,14 +271,36 @@ export async function GET(request: NextRequest) {
                             if (!market.active || market.closed) {
                                 return {
                                     ...market,
-                                    insiderDetection: { isInsider: false, signals: [], confidence: 'low' as const, details: {} },
+                                    insiderDetection: {
+                                        isInsider: false,
+                                        signals: [],
+                                        confidence: 'low' as const,
+                                        details: {
+                                            largeBidOrder: false,
+                                            largeAskOrder: false,
+                                            orderImbalance: false,
+                                            thinOrderBook: false,
+                                            aggressiveBidding: false
+                                        }
+                                    },
                                 };
                             }
 
                             const detection = await checkInsiderSignal(market.conditionId, market.volume24hr);
                             return {
                                 ...market,
-                                insiderDetection: detection || { isInsider: false, signals: [], confidence: 'low' as const, details: {} },
+                                insiderDetection: detection || {
+                                    isInsider: false,
+                                    signals: [],
+                                    confidence: 'low' as const,
+                                    details: {
+                                        largeBidOrder: false,
+                                        largeAskOrder: false,
+                                        orderImbalance: false,
+                                        thinOrderBook: false,
+                                        aggressiveBidding: false
+                                    }
+                                },
                             };
                         })
                     );

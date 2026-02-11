@@ -233,6 +233,7 @@ export const gammaApi = {
       closed: Boolean(event.closed),
       archived: Boolean(event.archived),
       volume: Number(event.volume || 0),
+      volume24hr: Number(event.volume24hr || 0),
       liquidity: Number(event.liquidity || 0),
       markets: (event.markets || []).map((m: any) => normalizeGammaMarket(m)),
     };
@@ -263,6 +264,7 @@ export const gammaApi = {
       closed: Boolean(event.closed),
       archived: Boolean(event.archived),
       volume: Number(event.volume || 0),
+      volume24hr: Number(event.volume24hr || 0),
       liquidity: Number(event.liquidity || 0),
       markets: (event.markets || []).map((m: any) => normalizeGammaMarket(m)),
     };
@@ -292,20 +294,6 @@ export const gammaApi = {
     if (!res.ok) throw new Error(`Gamma API error: ${res.status}`);
     const data = await res.json();
     return (data || []).map((e: Record<string, unknown>) => normalizeGammaEvent(e));
-  },
-
-  /**
-   * Get event by ID
-   */
-  async getEventById(id: string): Promise<GammaEvent | null> {
-    const url = `${GAMMA_API_BASE}/events/${id}`;
-    const res = await proxyFetch(url, { next: { revalidate: 60 } });
-    if (!res.ok) {
-      if (res.status === 404) return null;
-      throw new Error(`Gamma API error: ${res.status}`);
-    }
-    const data = await res.json();
-    return normalizeGammaEvent(data);
   },
 
   /**
@@ -391,11 +379,14 @@ function normalizeGammaEvent(e: Record<string, unknown>): GammaEvent {
     description: String(e.description || ''),
     startDate: String(e.startDate || ''),
     endDate: String(e.endDate || ''),
+    image: String(e.image || ''),
+    icon: String(e.icon || ''),
     volume: Number(e.volume || 0),
     volume24hr: Number(e.volume24hr || 0),
     liquidity: Number(e.liquidity || 0),
     active: Boolean(e.active),
     closed: Boolean(e.closed),
+    archived: Boolean(e.archived),
     markets: marketsRaw.map((m) => normalizeGammaMarket(m)),
   };
 }
@@ -1031,4 +1022,236 @@ export async function getUnifiedMarket(identifier: string): Promise<UnifiedMarke
     })),
     source: 'gamma',
   };
+}
+
+// ============================================================================
+// Batch API Helpers - Reduce call volume for better performance
+// ============================================================================
+
+/**
+ * Batch result type for parallel requests with individual error handling
+ */
+export interface BatchResult<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * Fetch multiple markets by condition IDs in a single batch
+ * Uses the Gamma API's batch query support when available
+ */
+export async function batchGetMarketsByConditionIds(
+  conditionIds: string[]
+): Promise<BatchResult<GammaMarket>[]> {
+  // Gamma API supports querying multiple markets via comma-separated condition_id
+  // But there's a URL length limit, so we batch in groups of 50
+  const BATCH_SIZE = 50;
+  const results: BatchResult<GammaMarket>[] = [];
+
+  for (let i = 0; i < conditionIds.length; i += BATCH_SIZE) {
+    const batch = conditionIds.slice(i, i + BATCH_SIZE);
+    const queryParams = batch.map(id => `condition_id=${id}`).join('&');
+    const url = `${GAMMA_API_BASE}/markets?${queryParams}`;
+
+    try {
+      const res = await proxyFetch(url);
+      if (!res.ok) {
+        // Mark all in this batch as failed
+        batch.forEach(() => {
+          results.push({ success: false, error: `HTTP ${res.status}` });
+        });
+        continue;
+      }
+
+      const data = await res.json();
+      const markets = (data || []) as Record<string, unknown>[];
+      const marketMap = new Map<string, GammaMarket>();
+
+      markets.forEach((m: Record<string, unknown>) => {
+        const normalized = normalizeGammaMarket(m);
+        marketMap.set(normalized.conditionId, normalized);
+      });
+
+      // Map results back to original order
+      batch.forEach(conditionId => {
+        const market = marketMap.get(conditionId);
+        if (market) {
+          results.push({ success: true, data: market });
+        } else {
+          results.push({ success: false, error: 'Market not found' });
+        }
+      });
+    } catch (error) {
+      batch.forEach(() => {
+        results.push({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Fetch multiple orderbooks in parallel with concurrency control
+ * Limits concurrent requests to avoid overwhelming the API
+ */
+export async function batchGetOrderbooks(
+  tokenIds: string[],
+  concurrency: number = 3
+): Promise<BatchResult<Orderbook>[]> {
+  const results: Map<string, BatchResult<Orderbook>> = new Map();
+
+  // Initialize all as pending
+  tokenIds.forEach(id => results.set(id, { success: false, error: 'Pending' }));
+
+  // Process in chunks to limit concurrency
+  for (let i = 0; i < tokenIds.length; i += concurrency) {
+    const chunk = tokenIds.slice(i, i + concurrency);
+
+    const chunkResults = await Promise.allSettled(
+      chunk.map(async (tokenId) => {
+        try {
+          const url = `${CLOB_API_BASE}/book?token_id=${tokenId}`;
+          const res = await proxyFetch(url);
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+          const data = await res.json() as Orderbook;
+          return { tokenId, success: true, data };
+        } catch (error) {
+          return {
+            tokenId,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          };
+        }
+      })
+    );
+
+    chunkResults.forEach(result => {
+      if (result.status === 'fulfilled') {
+        results.set(result.value.tokenId, {
+          success: result.value.success,
+          data: result.value.data,
+          error: result.value.error
+        });
+      }
+    });
+  }
+
+  return tokenIds.map(id => results.get(id)!);
+}
+
+/**
+ * Fetch market data with orderbooks in a single batch operation
+ * Returns enriched market data with current prices from orderbooks
+ */
+export async function batchGetMarketsWithPrices(
+  conditionIds: string[],
+  options: { concurrency?: number } = {}
+): Promise<BatchResult<(GammaMarket & { currentPrices?: { yes: number; no: number } })>[]> {
+  const { concurrency = 3 } = options;
+
+  // First, batch fetch all markets
+  const marketResults = await batchGetMarketsByConditionIds(conditionIds);
+
+  // Collect all token IDs for orderbook fetching
+  const tokenIdsToFetch: Array<{ tokenId: string; marketIndex: number }> = [];
+  const validMarkets: (GammaMarket & { currentPrices?: { yes: number; no: number } })[] = [];
+
+  marketResults.forEach((result, index) => {
+    if (result.success && result.data?.clobTokenIds) {
+      validMarkets.push(result.data);
+      result.data.clobTokenIds.forEach((tokenId, tokenIndex) => {
+        tokenIdsToFetch.push({ tokenId, marketIndex: index });
+      });
+    } else {
+      validMarkets.push(null as any); // Placeholder for failed markets
+    }
+  });
+
+  // Fetch orderbooks in parallel with concurrency limit
+  const flatTokenIds = tokenIdsToFetch.map(t => t.tokenId);
+  const orderbookResults = await batchGetOrderbooks(flatTokenIds, concurrency);
+
+  // Merge orderbook data back into markets
+  tokenIdsToFetch.forEach(({ tokenId, marketIndex }, index) => {
+    const orderbookResult = orderbookResults[index];
+    if (orderbookResult.success && orderbookResult.data) {
+      const book = orderbookResult.data;
+      const market = validMarkets[marketIndex];
+      if (market && !market.currentPrices) {
+        market.currentPrices = { yes: 0, no: 0 };
+      }
+      if (market) {
+        // First token is YES, second is NO
+        const price = book.bids[0]?.price ? parseFloat(book.bids[0].price) : 0;
+        if (index % 2 === 0) {
+          market.currentPrices!.yes = price;
+        } else {
+          market.currentPrices!.no = price;
+        }
+      }
+    }
+  });
+
+  return marketResults.map((result, index) => ({
+    success: result.success,
+    data: result.success ? validMarkets[index] : undefined,
+    error: result.error,
+  }));
+}
+
+/**
+ * Get top markets by 24h volume with enriched orderbook data
+ * A single efficient call that reduces API round trips
+ */
+export async function getTopMarketsWithOrderbooks(
+  limit: number = 10,
+  options: { concurrency?: number } = {}
+): Promise<(GammaMarket & { orderbook?: ReturnType<typeof processOrderbook> })[]> {
+  const { concurrency = 3 } = options;
+
+  // Fetch trending markets (single API call)
+  const markets = await gammaApi.getTrendingMarkets(limit);
+
+  // Collect token IDs for markets that have them
+  const marketsWithTokens = markets.filter(m => m.clobTokenIds && m.clobTokenIds.length >= 2);
+  const tokenIds = marketsWithTokens.flatMap(m => m.clobTokenIds!.slice(0, 2));
+
+  // Batch fetch orderbooks
+  const orderbookResults = await batchGetOrderbooks(tokenIds, concurrency);
+
+  // Merge orderbook data back into markets
+  const orderbookMap = new Map<string, Orderbook>();
+  tokenIds.forEach((id, index) => {
+    const result = orderbookResults[index];
+    if (result.success && result.data) {
+      orderbookMap.set(id, result.data);
+    }
+  });
+
+  return markets.map(market => {
+    if (!market.clobTokenIds || market.clobTokenIds.length < 2) {
+      return market;
+    }
+
+    const yesTokenId = market.clobTokenIds[0];
+    const noTokenId = market.clobTokenIds[1];
+    const yesBook = orderbookMap.get(yesTokenId);
+    const noBook = orderbookMap.get(noTokenId);
+
+    if (yesBook && noBook) {
+      return {
+        ...market,
+        orderbook: processOrderbook(yesBook, noBook),
+      };
+    }
+
+    return market;
+  });
 }

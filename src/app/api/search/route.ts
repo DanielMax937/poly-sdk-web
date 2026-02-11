@@ -96,7 +96,21 @@ export async function GET(request: NextRequest) {
         if (checkInsider && limitedMarkets.length > 0) {
             // Create a timeout promise for insider checks
             const timeoutPromise = new Promise<typeof limitedMarkets>((resolve) => {
-                setTimeout(() => resolve(limitedMarkets.map((m: any) => ({ ...m, insiderDetection: { isInsider: false, signals: ['Timeout'], confidence: 'low' as const, details: {} } }))), insiderTimeout);
+                setTimeout(() => resolve(limitedMarkets.map((m: any) => ({
+                    ...m,
+                    insiderDetection: {
+                        isInsider: false,
+                        signals: ['Timeout'],
+                        confidence: 'low' as const,
+                        details: {
+                            largeBidOrder: false,
+                            largeAskOrder: false,
+                            orderImbalance: false,
+                            thinOrderBook: false,
+                            aggressiveBidding: false
+                        }
+                    }
+                }))), insiderTimeout);
             });
 
             // Fetch insider data for all markets in parallel
@@ -105,7 +119,18 @@ export async function GET(request: NextRequest) {
                     const detection = await checkInsiderSignal(market.conditionId, market.volume24hr);
                     return {
                         ...market,
-                        insiderDetection: detection || { isInsider: false, signals: [], confidence: 'low' as const, details: {} },
+                        insiderDetection: detection || {
+                            isInsider: false,
+                            signals: [],
+                            confidence: 'low' as const,
+                            details: {
+                                largeBidOrder: false,
+                                largeAskOrder: false,
+                                orderImbalance: false,
+                                thinOrderBook: false,
+                                aggressiveBidding: false
+                            }
+                        },
                     };
                 })
             );

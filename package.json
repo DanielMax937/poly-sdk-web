@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:no-proxy": "HTTP_PROXY='' next dev",
+    "dev": "NODE_OPTIONS=\"--dns-result-order=ipv4first\" next dev",
+    "dev:proxy": "HTTP_PROXY=\"http://127.0.0.1:1087\" NODE_OPTIONS=\"--dns-result-order=ipv4first\" next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_OPTIONS=\"--dns-result-order=ipv4first\" next start",
+    "start:proxy": "HTTP_PROXY=\"http://127.0.0.1:1087\" NODE_OPTIONS=\"--dns-result-order=ipv4first\" next start",
     "lint": "eslint"
   },
   "dependencies": {
