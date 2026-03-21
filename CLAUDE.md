@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Next.js 16 demo application** for the @catalyst-team/poly-sdk - an interactive web interface for exploring Polymarket data and trading functionality. The app showcases 25+ demo pages covering market data, smart money tracking, arbitrage detection, and trading operations.
+This is a **Next.js 16 futures monitoring application** built on @catalyst-team/poly-sdk. It provides a base capability API layer and a futures business layer for 24h tracking and alerting.
 
 ## Development Commands
 
@@ -21,7 +21,7 @@ No test framework is currently configured (Playwright is installed but no tests 
 
 ### API Proxy Pattern
 
-All external Polymarket API calls are proxied through Next.js API routes in `src/app/api/`. Client-side code calls internal APIs (e.g., `/api/markets`) which then call external services. This provides:
+All external Polymarket API calls are proxied through Next.js API routes in `src/app/api/`. Client-side code calls internal APIs (e.g., `/api/base/search`) which then call external services. This provides:
 
 - CORS handling for cross-origin requests
 - Server-side proxy support via `src/lib/proxy-fetch.ts`
@@ -36,48 +36,39 @@ All external Polymarket API calls are proxied through Next.js API routes in `src
 ### Core Libraries
 
 - **`src/lib/sdk.ts`** (932 lines) - Main API client with three sub-APIs: `gammaApi`, `dataApi`, `clobApi`. Contains helper functions for orderbook processing, arbitrage detection, and unified market data.
-- **`src/lib/orders.ts`** (293 lines) - Authenticated order management using `@polymarket/clob-client`
-- **`src/lib/proxy-fetch.ts`** - Fetch wrapper that routes requests through a local HTTP proxy (default: `http://127.0.0.1:1087`)
+- **`src/lib/proxy-fetch.ts`** - Undici `ProxyAgent` on every Polymarket `fetch`; proxy URL from **`HTTPS_PROXY` → `HTTP_PROXY` → `ALL_PROXY`**
 
 ### Proxy Requirement
 
-The application requires a local HTTP proxy for API access. Configure via `HTTP_PROXY` environment variable (default: `http://127.0.0.1:1087`). Common proxy ports: Clash=7890, V2Ray=10809.
+Polymarket APIs are **HTTPS**. Prefer **`HTTPS_PROXY`** (e.g. `http://127.0.0.1:1087`); `HTTP_PROXY` / `ALL_PROXY` are also read. Local proxy for this repo is documented as **1087**.
 
 ### Directory Structure
 
 ```
 src/
 ├── app/
-│   ├── api/           # API route handlers (server-side proxy)
-│   ├── demos/         # 25+ demo pages showcasing SDK features
+│   ├── api/           # API route handlers (base + futures layers)
+│   ├── demos/         # Futures tooling pages
 │   ├── layout.tsx     # Root layout with Sidebar
 │   └── page.tsx       # Homepage with demo index
 ├── components/        # Reusable React components
-├── lib/              # Core business logic (sdk.ts, orders.ts, proxy-fetch.ts)
+├── lib/              # Core business logic (sdk.ts, proxy-fetch.ts, futures-*)
 ```
 
 ### Demo Pages
 
-The `src/app/demos/` directory contains example implementations. When adding new features, create a demo page first to demonstrate the pattern. Existing demos cover:
+The `src/app/console/` directory focuses on futures tooling:
 
-- Basic usage (trending markets, orderbook)
-- Smart money tracking (leaderboard, trader positions)
-- Market analysis (arbitrage detection)
-- Trading operations (orders, portfolio)
-- Real-time features (price tracking, WebSocket simulation)
+- Futures Monitor (`/console/futures-monitor`)
+- Futures Alerts (`/console/futures-alerts`)
+- Operations Monitoring (`/console/ops-monitoring`)
 
 ## Environment Variables
 
-Required for trading operations (see `.env.example`):
-
 ```
-POLY_PRIVATE_KEY         # Wallet private key (without 0x prefix)
-POLY_API_KEY            # L2 API key from createOrDeriveApiKey()
-POLY_API_SECRET         # L2 API secret
-POLY_API_PASSPHRASE     # L2 API passphrase
-POLY_SIGNATURE_TYPE     # 0=EOA, 1=Gnosis Safe, 2=MagicLink (default: 0)
-POLY_FUNDER_ADDRESS     # Optional funder address
-HTTP_PROXY              # Proxy URL (default: http://127.0.0.1:1087)
+HTTPS_PROXY             # Preferred for https:// Polymarket (or HTTP_PROXY / ALL_PROXY)
+ALERT_WEBHOOK_URL       # Optional API alert webhook
+FUTURES_ALERT_WEBHOOK_URL # Optional futures alert webhook
 ```
 
 ## TypeScript Configuration

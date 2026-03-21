@@ -43,6 +43,7 @@ export interface GammaEvent {
   id: string;
   slug: string;
   title: string;
+  /** May be empty when listing events without full detail */
   description: string;
   startDate: string;
   endDate: string;
@@ -280,6 +281,10 @@ export const gammaApi = {
     closed?: boolean;
     order?: string;
     ascending?: boolean;
+    /** Filter events by tag id (from GET /tags). See Polymarket Gamma API docs. */
+    tag_id?: number | string;
+    /** Partial slug match (if supported by API). */
+    slug_contains?: string;
   } = {}): Promise<GammaEvent[]> {
     const queryParams = new URLSearchParams();
     if (params.limit) queryParams.set('limit', String(params.limit));
@@ -288,6 +293,8 @@ export const gammaApi = {
     if (params.closed !== undefined) queryParams.set('closed', String(params.closed));
     if (params.order) queryParams.set('order', params.order);
     if (params.ascending !== undefined) queryParams.set('ascending', String(params.ascending));
+    if (params.tag_id !== undefined) queryParams.set('tag_id', String(params.tag_id));
+    if (params.slug_contains) queryParams.set('slug_contains', params.slug_contains);
 
     const url = `${GAMMA_API_BASE}/events?${queryParams.toString()}`;
     const res = await proxyFetch(url, { next: { revalidate: 60 } });

@@ -1,0 +1,37 @@
+import type { HardRule } from './types';
+
+export const CRUDE_OIL_RULE: HardRule = {
+  id: 'crude-oil',
+  match: [
+    '原油',
+    '石油',
+    '沥青',
+    'crude oil',
+    'crude',
+    'oil',
+    'wti',
+    'brent',
+    'opec',
+    'asphalt',
+    'bitumen',
+  ],
+  terms: [
+    'Middle East',
+    'Saudi Arabia',
+    'Iran',
+    'Iraq',
+    'UAE',
+    'Kuwait',
+    'Russia',
+    'Ukraine',
+    'NATO',
+    'OPEC',
+    'Strait of Hormuz',
+    'Red Sea',
+    'Gulf of Oman',
+    'sanctions',
+    'IEA',
+    'refining',
+    'bitumen',
+  ],
+};

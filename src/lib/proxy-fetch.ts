@@ -11,13 +11,26 @@
  *
  * Proxy Configuration:
  * - Default: No proxy (direct connection)
- * - To use proxy: Set HTTP_PROXY environment variable
- *   Example: HTTP_PROXY="http://127.0.0.1:1087" npm run dev
- * - Common proxy ports: Clash=7890, V2Ray=10809, Custom=1087
+ * - Polymarket uses **HTTPS**; Node/undici convention is **HTTPS_PROXY** for https:// origins.
+ *   We resolve: **HTTPS_PROXY → HTTP_PROXY → ALL_PROXY** (first non-empty).
+ * - Example: `HTTPS_PROXY="http://127.0.0.1:1087" npm run dev`
+ * - Local proxy for this repo: **1087** (HTTP CONNECT)
+ *
+ * Undici: all Polymarket traffic goes through `fetch(..., { dispatcher: ProxyAgent })`.
+ * Incoming `options.dispatcher` is stripped so user code cannot disable the proxy.
  */
 
-import { HttpsProxyAgent } from 'https-proxy-agent';
-import type { Agent } from 'http';
+import { ProxyAgent } from 'undici';
+
+function resolveProxyUrl(): string {
+  const raw =
+    process.env.HTTPS_PROXY?.trim() ||
+    process.env.HTTP_PROXY?.trim() ||
+    process.env.ALL_PROXY?.trim() ||
+    '';
+  if (!raw || raw.toLowerCase() === 'none') return '';
+  return raw;
+}
 
 // ============================================================================
 // Configuration
@@ -108,21 +121,24 @@ const rateLimiter = new RateLimiter();
 // Proxy Configuration (DEFAULT: NO PROXY)
 // ============================================================================
 
-// Get proxy URL from environment variable (default: empty = no proxy)
-const proxyUrl = process.env.HTTP_PROXY || '';
+const proxyUrl = resolveProxyUrl();
 
-let agent: Agent | undefined = undefined;
+let dispatcher: ProxyAgent | undefined = undefined;
 
-// Only create proxy agent if HTTP_PROXY is explicitly set
-if (proxyUrl && proxyUrl !== '' && proxyUrl !== 'none') {
+if (proxyUrl) {
     try {
-        console.log(`[ProxyFetch] Using proxy: ${proxyUrl}`);
-        agent = new HttpsProxyAgent(proxyUrl) as unknown as Agent;
+        const via =
+            process.env.HTTPS_PROXY?.trim() ? 'HTTPS_PROXY'
+            : process.env.HTTP_PROXY?.trim() ? 'HTTP_PROXY'
+            : 'ALL_PROXY';
+        console.log(`[ProxyFetch] Using proxy (${via}): ${proxyUrl}`);
+        // Object form is explicit for undici v6; string form also supported
+        dispatcher = new ProxyAgent({ uri: proxyUrl });
     } catch (e) {
-        console.warn('[ProxyFetch] Failed to create proxy agent, connecting directly:', e);
+        console.warn('[ProxyFetch] Failed to create ProxyAgent, connecting directly:', e);
     }
 } else {
-    console.log('[ProxyFetch] No proxy configured - using direct connection');
+    console.log('[ProxyFetch] No proxy — set HTTPS_PROXY or HTTP_PROXY for Polymarket (HTTPS)');
 }
 
 // ============================================================================
@@ -172,11 +188,14 @@ async function fetchWithRetry(url: string, options: FetchOptions = {}): Promise<
     const retryCount = options.retryCount ?? 0;
 
     try {
-        // Force IPv4 by using the DNS family hint (Node.js 18+)
-        const fetchOptions: RequestInit & { dispatcher?: any } = {
-            ...options,
-            // Use the proxy agent if configured
-            ...(agent ? { agent } : {}),
+        const { dispatcher: _ignoreUserDispatcher, retryCount: _rc, ...rest } = options as FetchOptions & {
+            dispatcher?: unknown;
+        };
+
+        // Never let a caller-supplied dispatcher bypass our ProxyAgent (undici merges init.dispatcher)
+        const fetchOptions: RequestInit & { dispatcher?: ProxyAgent } = {
+            ...rest,
+            ...(dispatcher ? { dispatcher } : {}),
         };
 
         const response = await fetch(url, fetchOptions);
@@ -232,8 +251,8 @@ export interface ProxyFetchOptions extends RequestInit {
  * - Optional proxy support via HTTP_PROXY env variable
  *
  * Proxy Usage (optional):
- *   Set HTTP_PROXY environment variable to use a proxy
- *   Example: HTTP_PROXY="http://127.0.0.1:1087" npm run dev
+ *   Set HTTPS_PROXY (preferred for https:// Polymarket) or HTTP_PROXY / ALL_PROXY
+ *   Example: HTTPS_PROXY="http://127.0.0.1:1087" npm run dev
  *
  * @example
  * ```ts
@@ -333,7 +352,15 @@ export function getRateLimiterStats() {
 export function getProxyConfig() {
     return {
         proxyUrl: proxyUrl || null,
-        usingProxy: !!agent,
-        message: agent ? `Using proxy: ${proxyUrl}` : 'No proxy - direct connection',
+        usingProxy: !!dispatcher,
+        message: dispatcher ? `Using proxy: ${proxyUrl}` : 'No proxy - direct connection',
+        /** Which env was used (for debugging) */
+        source: process.env.HTTPS_PROXY?.trim()
+            ? 'HTTPS_PROXY'
+            : process.env.HTTP_PROXY?.trim()
+              ? 'HTTP_PROXY'
+              : process.env.ALL_PROXY?.trim()
+                ? 'ALL_PROXY'
+                : null,
     };
 }

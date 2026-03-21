@@ -4,21 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const demos = [
-
-    { name: 'Orders', href: '/demos/orders', icon: '📝' },
-    { name: 'Basic Usage', href: '/demos/basic-usage', icon: '📊' },
-    { name: 'Smart Money', href: '/demos/smart-money', icon: '💰' },
-    { name: 'Market Analysis', href: '/demos/market-analysis', icon: '📈' },
-    { name: 'K-Line Charts', href: '/demos/kline', icon: '📉' },
-    { name: 'Follow Wallet', href: '/demos/follow-wallet', icon: '👀' },
-    { name: 'Services Demo', href: '/demos/services', icon: '⚡' },
-    { name: 'Realtime WS', href: '/demos/realtime', icon: '🔴' },
-    { name: 'Trading Orders', href: '/demos/trading', icon: '💱' },
-    { name: 'Rewards', href: '/demos/rewards', icon: '🏆' },
-    { name: 'CTF Operations', href: '/demos/ctf', icon: '🔄' },
-    { name: 'Arbitrage Scan', href: '/demos/arbitrage-scan', icon: '🔍' },
-    { name: 'Trending Arb', href: '/demos/trending-arb', icon: '🔥' },
-    { name: 'Arb Service', href: '/demos/arbitrage-service', icon: '🤖' },
+    { name: 'Futures Monitoring', href: '/console/futures-monitor', icon: '🛰️' },
+    { name: 'Futures Alerts', href: '/console/futures-alerts', icon: '🚨' },
+    { name: 'Operations Monitoring', href: '/console/ops-monitoring', icon: '🧪' },
 ];
 
 export function Sidebar() {
@@ -35,7 +23,7 @@ export function Sidebar() {
 
             <nav className="flex-1 overflow-y-auto p-4">
                 <div className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3 px-3">
-                    Demo Pages
+                    Console
                 </div>
                 <div className="space-y-1">
                     {demos.map((demo) => (

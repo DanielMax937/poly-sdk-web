@@ -1,14 +1,12 @@
-# Polymarket SDK Web Demo
+# Polymarket Futures Monitoring
 
-Interactive web interface for exploring Polymarket data and trading functionality. Built with Next.js 16, showcasing 25+ demo pages covering market data, smart money tracking, arbitrage detection, and trading operations.
+Futures-focused monitoring and alerting built on Polymarket data. Includes a base capability API layer and a business layer for 24h tracking and alerts.
 
 ## Features
 
-- **Market Data**: Trending markets, search, events, and price history
-- **Smart Money Tracking**: Leaderboard, trader positions, activity feeds
-- **Arbitrage Detection**: Real-time orderbook analysis and profit opportunities
-- **Trading Operations**: Order management, portfolio tracking
-- **Real-time Features**: Price tracking, WebSocket simulation
+- **Futures Monitoring**: 24h tracking with movement and insider alerts
+- **Ops Monitoring**: API health and request metrics dashboard
+- **Base API Layer**: Search and orderbook capability endpoints (with LLM query rewrite)
 
 ## Getting Started
 
@@ -65,14 +63,43 @@ This project includes several optimizations to make Polymarket API calls more re
 
 ### Environment Variables
 
-```bash
-# Optional: Use a proxy for API calls
-HTTP_PROXY="http://127.0.0.1:1087"
+Polymarket endpoints are **HTTPS**. This project uses **undici** `ProxyAgent` on every `proxyFetch` call; the proxy URL is resolved as **`HTTPS_PROXY` → `HTTP_PROXY` → `ALL_PROXY`** (first set wins). Prefer **`HTTPS_PROXY`** so Node matches common tooling expectations.
 
-# Common proxy ports:
-# - Clash: 7890
-# - V2Ray: 10809
-# - Custom: 1087
+```bash
+# Recommended for HTTPS origins (Gamma, CLOB, Data API)
+HTTPS_PROXY="http://127.0.0.1:1087"
+# Also supported:
+# HTTP_PROXY="http://127.0.0.1:1087"
+# ALL_PROXY="http://127.0.0.1:1087"
+
+# Optional: `npm run snapshot:themes` exits if no proxy is configured
+# POLYMARKET_REQUIRE_PROXY=1
+
+# This project’s documented local proxy (HTTP CONNECT): 1087
+# Other tools may use 7890 (Clash) or 10809 (V2Ray) — set to match your client.
+```
+
+## Monitoring
+
+The API layer exposes lightweight health and metrics endpoints for internal monitoring:
+
+- `GET /api/health`
+- `GET /api/metrics?limit=200`
+
+Optional alerting via webhook:
+
+```bash
+ALERT_WEBHOOK_URL="https://your-webhook-endpoint"
+ALERT_MIN_REQUESTS=20
+ALERT_ERROR_RATE=0.2
+ALERT_P95_MS=2500
+ALERT_COOLDOWN_MS=300000
+```
+
+Futures alert webhook (optional, overrides ALERT_WEBHOOK_URL for futures alerts):
+
+```bash
+FUTURES_ALERT_WEBHOOK_URL="https://your-futures-alert-endpoint"
 ```
 
 ### Scripts
@@ -84,6 +111,17 @@ HTTP_PROXY="http://127.0.0.1:1087"
 | `npm run build` | Build for production |
 | `npm run start` | Production server (no proxy) |
 | `npm run start:proxy` | Production server with proxy |
+| `npm test` | Run unit tests (Jest) |
+| `npm run test:e2e` | Run E2E tests (Playwright) |
+| `npm run snapshot:themes` | Pull Gamma tags + themed events (set proxy env yourself) |
+| `npm run snapshot:themes:proxy` | Same, with **`http://127.0.0.1:1087`** as `HTTPS_PROXY` + `HTTP_PROXY` |
+
+### E2E Tests
+
+```bash
+npx playwright install
+npm run test:e2e
+```
 
 ## Architecture
 
@@ -112,7 +150,6 @@ This provides:
 
 - **`src/lib/proxy-fetch.ts`** - Enhanced HTTP client with rate limiting, retry logic, browser headers
 - **`src/lib/sdk.ts`** - Main API client with Gamma, Data, and CLOB sub-APIs
-- **`src/lib/orders.ts`** - Authenticated order management using `@polymarket/clob-client`
 
 ## Troubleshooting
 
@@ -156,15 +193,40 @@ console.log(getProxyConfig());
 src/
 ├── app/
 │   ├── api/           # API route handlers (server-side proxy)
-│   ├── demos/         # 25+ demo pages
+│   ├── console/       # Futures tooling pages
 │   ├── layout.tsx     # Root layout with Sidebar
 │   └── page.tsx       # Homepage with demo index
 ├── components/        # Reusable React components
 └── lib/              # Core business logic
     ├── proxy-fetch.ts # Enhanced HTTP client
-    ├── sdk.ts         # Main API client
-    └── orders.ts      # Order management
+    └── sdk.ts         # Main API client
 ```
+
+## Polymarket theme snapshot (hard rules)
+
+To align **futures rewrite hard rules** with what is actually liquid on Polymarket, run:
+
+```bash
+npm run snapshot:themes
+# If Gamma is unreachable (e.g. regional network), use a proxy (HTTPS targets → prefer HTTPS_PROXY):
+HTTPS_PROXY="http://127.0.0.1:1087" npm run snapshot:themes
+# Strict: require proxy or exit
+# POLYMARKET_REQUIRE_PROXY=1 HTTPS_PROXY="http://127.0.0.1:1087" npm run snapshot:themes
+```
+
+This walks **Gamma `/tags`** (filtered by finance/geo/politics-related substrings), fetches **`/events?tag_id=…`**, and writes **`reports/polymarket-theme-snapshot.json`** with high-liquidity event titles, token/country/geo frequency, and suggested English seeds. Edit `src/data/polymarket-geolex.ts` (tag filters) and `src/lib/futures-rewrite-hard-rules/*.ts` using that report.
+
+## API Layers
+
+This project exposes two API layers:
+
+1. **Base (Demo) Layer**: Raw capability endpoints for search and orderbooks.  
+   Path prefix: `/api/base/*`  
+   Examples: `/api/base/orderbook`, `/api/base/search`
+
+2. **Business Layer (Futures)**: Business logic and monitoring/alerting for futures workflows.  
+   Path prefix: `/api/futures/*`  
+   Examples: `/api/futures/monitor`, `/api/futures/alerts`
 
 ## License
 

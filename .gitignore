@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/
@@ -30,9 +32,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Secrets & API keys (LLM: VOLC_* / OPENAI_* / ANTHROPIC_*; Polymarket: POLY_*)
+# Never commit real keys — only .env.example templates.
 .env*
 !.env.example
+# direnv / local overrides that often hold keys
+.envrc
 
 # vercel
 .vercel

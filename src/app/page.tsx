@@ -2,82 +2,22 @@ import Link from 'next/link';
 
 const demos = [
   {
-    name: 'Basic Usage',
-    href: '/demos/basic-usage',
-    icon: '📊',
-    description: 'Trending markets, orderbook display, and market details'
+    name: 'Futures Monitoring',
+    href: '/console/futures-monitor',
+    icon: '🛰️',
+    description: 'Commodity keyword scan with sudden movement and insider signals'
   },
   {
-    name: 'Smart Money',
-    href: '/demos/smart-money',
-    icon: '💰',
-    description: 'Leaderboard, trader positions, and activity tracking'
+    name: 'Futures Alerts',
+    href: '/console/futures-alerts',
+    icon: '🚨',
+    description: '24h server-side tracking with movement and insider alerts'
   },
   {
-    name: 'Market Analysis',
-    href: '/demos/market-analysis',
-    icon: '📈',
-    description: 'Analyze markets for arbitrage opportunities'
-  },
-  {
-    name: 'K-Line Charts',
-    href: '/demos/kline',
-    icon: '📉',
-    description: 'Trade data visualization with OHLCV charts'
-  },
-  {
-    name: 'Follow Wallet',
-    href: '/demos/follow-wallet',
-    icon: '👀',
-    description: 'Track smart money positions and exit signals'
-  },
-  {
-    name: 'Services Demo',
-    href: '/demos/services',
-    icon: '⚡',
-    description: 'WalletService and MarketService demonstrations'
-  },
-  {
-    name: 'Realtime WebSocket',
-    href: '/demos/realtime',
-    icon: '🔴',
-    description: 'Live price updates and orderbook changes'
-  },
-  {
-    name: 'Trading Orders',
-    href: '/demos/trading',
-    icon: '💱',
-    description: 'Order form UI for limit and market orders'
-  },
-  {
-    name: 'Rewards Tracking',
-    href: '/demos/rewards',
-    icon: '🏆',
-    description: 'Market making incentives and earnings'
-  },
-  {
-    name: 'CTF Operations',
-    href: '/demos/ctf',
-    icon: '🔄',
-    description: 'Split, merge, and redeem operations info'
-  },
-  {
-    name: 'Arbitrage Scan',
-    href: '/demos/arbitrage-scan',
-    icon: '🔍',
-    description: 'Live scanner for arbitrage opportunities'
-  },
-  {
-    name: 'Trending Arb Monitor',
-    href: '/demos/trending-arb',
-    icon: '🔥',
-    description: 'Monitor top markets for profit opportunities'
-  },
-  {
-    name: 'Arbitrage Service',
-    href: '/demos/arbitrage-service',
-    icon: '🤖',
-    description: 'Full arbitrage workflow dashboard'
+    name: 'Operations Monitoring',
+    href: '/console/ops-monitoring',
+    icon: '🧪',
+    description: 'Internal API health summary and recent request metrics'
   },
 ];
 
@@ -89,7 +29,7 @@ export default function HomePage() {
           Poly SDK Web
         </h1>
         <p className="text-white/70 text-lg max-w-2xl">
-          Interactive web interface for the{' '}
+          Futures-focused tooling built on{' '}
           <a
             href="https://github.com/cyl19970726/poly-sdk"
             target="_blank"
@@ -98,29 +38,25 @@ export default function HomePage() {
           >
             @catalyst-team/poly-sdk
           </a>.
-          Explore Polymarket data, analyze markets, track smart money, and more.
+          Monitor markets, detect anomalies, and manage alerts.
         </p>
       </div>
 
       <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">API Endpoints Used</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-xl font-semibold mb-4">API Layers</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="glass-card p-4">
-            <div className="text-sm font-mono text-blue-400 mb-1">data-api.polymarket.com</div>
-            <div className="text-xs text-white/50">Positions, trades, leaderboard</div>
+            <div className="text-sm font-mono text-blue-400 mb-1">/api/base/*</div>
+            <div className="text-xs text-white/50">Capability layer (search, orderbook)</div>
           </div>
           <div className="glass-card p-4">
-            <div className="text-sm font-mono text-purple-400 mb-1">gamma-api.polymarket.com</div>
-            <div className="text-xs text-white/50">Market discovery, events</div>
-          </div>
-          <div className="glass-card p-4">
-            <div className="text-sm font-mono text-green-400 mb-1">clob.polymarket.com</div>
-            <div className="text-xs text-white/50">Orderbook, trading</div>
+            <div className="text-sm font-mono text-red-400 mb-1">/api/futures/*</div>
+            <div className="text-xs text-white/50">Business layer (monitoring, alerts)</div>
           </div>
         </div>
       </div>
 
-      <h2 className="text-xl font-semibold mb-4">Demo Pages</h2>
+      <h2 className="text-xl font-semibold mb-4">Tools</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {demos.map((demo) => (
           <Link key={demo.href} href={demo.href}>
