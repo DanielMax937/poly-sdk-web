@@ -39,6 +39,18 @@ HTTP_PROXY="http://127.0.0.1:1087" npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to see the result.
 
+### Background (local-service)
+
+与 Cursor **local-service** skill 约定一致：默认在 **3010** 端口后台启动 Next 开发服务（避免占用 3000），健康检查为 `/api/health`。
+
+```bash
+./start-bg.sh    # PORT=3010，日志 poly-sdk-web.log
+./stop-bg.sh
+# 自定义端口：PORT=3020 ./start-bg.sh  （stop 需相同 PORT）
+```
+
+配置已登记在 `~/.local-service/services.json`（`poly-sdk-web`）。
+
 ### Production Build
 
 ```bash

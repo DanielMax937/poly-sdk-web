@@ -39,6 +39,10 @@ yarn-error.log*
 # direnv / local overrides that often hold keys
 .envrc
 
+# local-service background (start-bg.sh / stop-bg.sh)
+poly-sdk-web.pid
+poly-sdk-web.log
+
 # vercel
 .vercel
 
