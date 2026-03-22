@@ -3,31 +3,32 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-PORT="${PORT:-3010}"
-PID_FILE="${POLY_SDK_WEB_PID_FILE:-./poly-sdk-web.pid}"
+APP_NAME="poly-sdk-web"
 
-if PID=$(lsof -ti:"$PORT" 2>/dev/null); then
-  echo "Stopping Poly SDK Web on port $PORT (PID: $PID)..."
-  echo "$PID" | xargs kill 2>/dev/null || true
-  sleep 2
-  if lsof -ti:"$PORT" >/dev/null 2>&1; then
-    echo "Force stopping..."
+if command -v pm2 &>/dev/null; then
+  PM2="pm2"
+elif [ -f "./node_modules/.bin/pm2" ]; then
+  PM2="./node_modules/.bin/pm2"
+else
+  echo "PM2 not found. Trying fallback (port kill)..."
+  PORT="${PORT:-3010}"
+  if PID=$(lsof -ti:"$PORT" 2>/dev/null); then
+    echo "Stopping process on port $PORT (PID: $PID)..."
+    echo "$PID" | xargs kill 2>/dev/null || true
+    sleep 2
     lsof -ti:"$PORT" | xargs kill -9 2>/dev/null || true
+    rm -f ./poly-sdk-web.pid
+    echo "✓ Stopped"
+  else
+    echo "No process on port $PORT"
   fi
-  rm -f "$PID_FILE"
-  echo "✓ Service stopped"
   exit 0
 fi
 
-if [ -f "$PID_FILE" ]; then
-  PID=$(cat "$PID_FILE")
-  if kill -0 "$PID" 2>/dev/null; then
-    echo "Stopping Poly SDK Web (PID: $PID)..."
-    kill "$PID" 2>/dev/null || true
-    sleep 2
-    kill -9 "$PID" 2>/dev/null || true
-  fi
-  rm -f "$PID_FILE"
+if $PM2 describe "$APP_NAME" &>/dev/null; then
+  echo "Stopping $APP_NAME (PM2)..."
+  $PM2 stop "$APP_NAME"
+  echo "✓ Service stopped"
+else
+  echo "PM2 app '$APP_NAME' not found. Service not running?"
 fi
-
-echo "No process found on port $PORT. Service not running?"

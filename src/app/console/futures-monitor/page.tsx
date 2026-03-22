@@ -240,21 +240,22 @@ export default function FuturesTraderPage() {
 
             {/* Search Controls */}
             <div className="glass-card mb-6">
-                <div className="flex flex-wrap gap-4 items-end">
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-sm text-white/60 mb-2">Quick Keywords</label>
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-end">
+                    <div className="min-w-0 flex-1">
+                        <label className="mb-2 block text-sm text-white/75">Quick Keywords</label>
                         <div className="flex flex-wrap gap-2">
                             {KEYWORDS.map(keyword => (
                                 <button
                                     key={keyword}
+                                    type="button"
                                     onClick={() => {
                                         setSelectedKeyword(keyword);
                                         setCustomKeyword('');
                                     }}
-                                    className={`px-3 py-1.5 rounded text-sm transition ${
+                                    className={`rounded-lg border px-3 py-1.5 text-sm transition ${
                                         selectedKeyword === keyword && !customKeyword
-                                            ? 'bg-blue-500 text-white'
-                                            : 'bg-white/10 hover:bg-white/20'
+                                            ? 'border-sky-500/50 bg-sky-600/25 text-sky-100 shadow-sm'
+                                            : 'border-white/10 bg-white/[0.08] text-white/85 hover:border-white/20 hover:bg-white/[0.12]'
                                     }`}
                                 >
                                     {keyword}
@@ -263,22 +264,23 @@ export default function FuturesTraderPage() {
                         </div>
                     </div>
 
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-sm text-white/60 mb-2">Custom Keyword</label>
+                    <div className="min-w-0 flex-1">
+                        <label className="mb-2 block text-sm text-white/75">Custom Keyword</label>
                         <input
                             type="text"
                             value={customKeyword}
                             onChange={(e) => setCustomKeyword(e.target.value)}
                             placeholder="e.g., S&P 500, inflation..."
-                            className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded focus:outline-none focus:border-blue-500"
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                            className="w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-white placeholder:text-white/60 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         />
                     </div>
 
                     <button
+                        type="button"
                         onClick={handleSearch}
                         disabled={searching}
-                        className="px-6 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 rounded font-semibold transition"
+                        className="shrink-0 rounded-lg bg-sky-600 px-6 py-2.5 font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {searching ? 'Searching...' : 'Search'}
                     </button>
@@ -289,19 +291,19 @@ export default function FuturesTraderPage() {
             {markets.length > 0 && !searching && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div className="glass-card">
-                        <div className="text-sm text-white/50">Markets Found</div>
+                        <div className="text-sm text-white/65">Markets Found</div>
                         <div className="text-2xl font-bold">{markets.length}</div>
                     </div>
                     <div className="glass-card">
-                        <div className="text-sm text-white/50">Insider Signals</div>
+                        <div className="text-sm text-white/65">Insider Signals</div>
                         <div className="text-2xl font-bold text-red-400">{insiderCount}</div>
                     </div>
                     <div className="glass-card">
-                        <div className="text-sm text-white/50">Monitoring</div>
+                        <div className="text-sm text-white/65">Monitoring</div>
                         <div className="text-2xl font-bold text-blue-400">{monitoring.size}</div>
                     </div>
                     <div className="glass-card">
-                        <div className="text-sm text-white/50">Total Volume (24h)</div>
+                        <div className="text-sm text-white/65">Total Volume (24h)</div>
                         <div className="text-2xl font-bold">
                             ${(markets.reduce((sum, m) => sum + (m.volume24hr || 0), 0) / 1000).toFixed(0)}K
                         </div>
@@ -313,12 +315,19 @@ export default function FuturesTraderPage() {
             {error && <ErrorMessage message={error} />}
 
             {/* Loading */}
-            {searching && <LoadingSpinner text="Searching markets and analyzing orderbooks..." />}
+            {searching && (
+                <LoadingSpinner text="Searching markets and analyzing orderbooks…" />
+            )}
 
-            {/* Results */}
+            {/* Empty — no results (search completed) */}
             {!searching && markets.length === 0 && !error && (
-                <div className="glass-card text-center py-12">
-                    <p className="text-white/50">Enter a keyword to search for related markets</p>
+                <div className="glass-card border border-white/15 py-14 text-center">
+                    <p className="text-base text-white/80">
+                        No markets matched this query. Adjust the keyword or pick a quick tag above.
+                    </p>
+                    <p className="mt-2 text-sm text-white/55">
+                        If this persists, check the network or Polymarket API availability.
+                    </p>
                 </div>
             )}
 

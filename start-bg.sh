@@ -4,31 +4,42 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 PORT="${PORT:-3010}"
-PID_FILE="${POLY_SDK_WEB_PID_FILE:-./poly-sdk-web.pid}"
-LOG_FILE="${POLY_SDK_WEB_LOG_FILE:-./poly-sdk-web.log}"
+APP_NAME="poly-sdk-web"
 
-if lsof -ti:"$PORT" >/dev/null 2>&1; then
-  echo "Port $PORT already in use. Stop the service first with: ./stop-bg.sh"
-  exit 1
+# Ensure pm2 is available (local or global)
+if ! command -v pm2 &>/dev/null; then
+  if [ -f "./node_modules/.bin/pm2" ]; then
+    PM2="./node_modules/.bin/pm2"
+  else
+    echo "PM2 not found. Installing..."
+    npm install pm2 --save-dev
+    PM2="./node_modules/.bin/pm2"
+  fi
+else
+  PM2="pm2"
 fi
 
-echo "──────────────────────────────────────────"
-echo "  Poly SDK Web (Next.js)"
-echo ""
-echo "  URL:      http://127.0.0.1:${PORT}"
-echo "  Health:   http://127.0.0.1:${PORT}/api/health"
-echo "  Log file: $LOG_FILE"
-echo "──────────────────────────────────────────"
-
 export PORT
-export NODE_OPTIONS="--dns-result-order=ipv4first ${NODE_OPTIONS:-}"
-nohup npm run dev >> "$LOG_FILE" 2>&1 &
-SERVICE_PID=$!
-echo $SERVICE_PID > "$PID_FILE"
+
+if $PM2 describe "$APP_NAME" &>/dev/null; then
+  echo "Restarting existing PM2 app..."
+  $PM2 restart "$APP_NAME" --update-env
+else
+  echo "──────────────────────────────────────────"
+  echo "  Poly SDK Web (Next.js) — PM2"
+  echo ""
+  echo "  URL:      http://127.0.0.1:${PORT}"
+  echo "  Health:   http://127.0.0.1:${PORT}/api/health"
+  echo "──────────────────────────────────────────"
+  echo ""
+  $PM2 start ecosystem.config.cjs
+fi
 
 echo ""
-echo "✓ Service started (PID: $SERVICE_PID)"
+echo "✓ Service started via PM2"
 echo ""
 echo "Commands:"
-echo "  View logs:  tail -f $LOG_FILE"
-echo "  Stop:       ./stop-bg.sh"
+echo "  Logs:   pm2 logs $APP_NAME"
+echo "  Stop:   ./stop-bg.sh"
+echo "  Status: pm2 status $APP_NAME"
+echo ""

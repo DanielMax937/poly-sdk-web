@@ -28,7 +28,7 @@ export default function HomePage() {
         <h1 className="text-4xl font-bold gradient-text mb-4">
           Poly SDK Web
         </h1>
-        <p className="text-white/70 text-lg max-w-2xl">
+        <p className="text-lg max-w-2xl text-white/85">
           Futures-focused tooling built on{' '}
           <a
             href="https://github.com/cyl19970726/poly-sdk"
@@ -47,11 +47,11 @@ export default function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="glass-card p-4">
             <div className="text-sm font-mono text-blue-400 mb-1">/api/base/*</div>
-            <div className="text-xs text-white/50">Capability layer (search, orderbook)</div>
+            <div className="text-xs text-white/85">Capability layer (search, orderbook)</div>
           </div>
           <div className="glass-card p-4">
             <div className="text-sm font-mono text-red-400 mb-1">/api/futures/*</div>
-            <div className="text-xs text-white/50">Business layer (monitoring, alerts)</div>
+            <div className="text-xs text-white/85">Business layer (monitoring, alerts)</div>
           </div>
         </div>
       </div>
@@ -67,7 +67,7 @@ export default function HomePage() {
                   {demo.name}
                 </h3>
               </div>
-              <p className="text-sm text-white/50">{demo.description}</p>
+              <p className="text-sm text-white/85">{demo.description}</p>
             </div>
           </Link>
         ))}

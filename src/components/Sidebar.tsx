@@ -13,41 +13,41 @@ export function Sidebar() {
     const pathname = usePathname();
 
     return (
-        <aside className="fixed left-0 top-0 h-screen w-64 bg-[#0f0f15] border-r border-white/10 flex flex-col">
-            <div className="p-6 border-b border-white/10">
-                <Link href="/" className="flex items-center gap-3">
-                    <span className="text-2xl">🔮</span>
-                    <span className="text-lg font-bold gradient-text">Poly SDK Web</span>
+        <aside className="flex w-full shrink-0 flex-col border-b border-white/10 bg-[#0f0f15] md:h-auto md:min-h-screen md:w-64 md:border-b-0 md:border-r">
+            <div className="border-b border-white/10 p-4 md:p-6">
+                <Link href="/" className="flex min-w-0 items-center gap-3">
+                    <span className="shrink-0 text-2xl" aria-hidden>🔮</span>
+                    <span className="min-w-0 truncate text-lg font-bold gradient-text">Poly SDK Web</span>
                 </Link>
             </div>
 
-            <nav className="flex-1 overflow-y-auto p-4">
-                <div className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3 px-3">
+            <nav className="flex flex-1 flex-col p-3 md:overflow-y-auto md:p-4">
+                <div className="sidebar-section-label mb-2 px-3 md:mb-3">
                     Console
                 </div>
-                <div className="space-y-1">
+                <div className="flex flex-row gap-1 overflow-x-auto pb-1 md:flex-col md:gap-0 md:space-y-1 md:overflow-visible md:pb-0">
                     {demos.map((demo) => (
                         <Link
                             key={demo.href}
                             href={demo.href}
-                            className={`nav-link ${pathname === demo.href ? 'active' : ''}`}
+                            className={`nav-link shrink-0 md:w-full ${pathname === demo.href ? 'active' : ''}`}
                         >
-                            <span>{demo.icon}</span>
-                            <span>{demo.name}</span>
+                            <span className="shrink-0">{demo.icon}</span>
+                            <span className="whitespace-nowrap">{demo.name}</span>
                         </Link>
                     ))}
                 </div>
             </nav>
 
-            <div className="p-4 border-t border-white/10">
-                <div className="glass-card p-3">
-                    <p className="text-xs text-white/60">
+            <div className="border-t border-white/10 p-3 md:p-4">
+                <div className="rounded-xl border border-white/10 bg-white/[0.06] p-3">
+                    <p className="text-xs leading-relaxed text-white/90 break-words">
                         Powered by{' '}
                         <a
                             href="https://github.com/cyl19970726/poly-sdk"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-400 hover:underline"
+                            className="text-sky-400 underline-offset-2 hover:text-sky-300 hover:underline"
                         >
                             @catalyst-team/poly-sdk
                         </a>

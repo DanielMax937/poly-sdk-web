@@ -49,7 +49,7 @@ const FUTURES_ALERT_WEBHOOK_URL = process.env.FUTURES_ALERT_WEBHOOK_URL || proce
 let running = false;
 let intervalHandle: NodeJS.Timeout | null = null;
 let lastRunAt: number | null = null;
-let keywords = [...DEFAULT_KEYWORDS];
+let keywords: string[] = [];
 let intervalMs = DEFAULT_CONFIG.intervalMs;
 
 const snapshots = new Map<string, OrderbookSnapshot>();
@@ -246,10 +246,20 @@ async function runCycle() {
 }
 
 export async function startFuturesMonitor(options?: { keywords?: string[]; intervalMs?: number }) {
-  if (running) return;
+  const reconfiguring = running;
   running = true;
-  if (options?.keywords && options.keywords.length > 0) keywords = options.keywords;
+
+  if (options?.keywords && options.keywords.length > 0) {
+    keywords = [...options.keywords];
+  } else if (!reconfiguring) {
+    keywords = [...DEFAULT_KEYWORDS];
+  }
   if (options?.intervalMs && options.intervalMs >= 10_000) intervalMs = options.intervalMs;
+
+  if (reconfiguring && intervalHandle) {
+    clearInterval(intervalHandle);
+    intervalHandle = null;
+  }
 
   await buildRewriteCache(keywords);
   await runCycle();

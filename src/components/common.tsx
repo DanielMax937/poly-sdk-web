@@ -1,20 +1,20 @@
 export function LoadingSpinner({ text = 'Loading...' }: { text?: string }) {
     return (
-        <div className="flex flex-col items-center justify-center py-12">
-            <div className="spinner mb-4" />
-            <p className="text-white/50">{text}</p>
+        <div className="flex flex-col items-center justify-center gap-6 py-16">
+            <div className="spinner" />
+            <p className="text-center text-sm text-white/85 min-h-[1.25rem]">{text}</p>
         </div>
     );
 }
 
 export function ErrorMessage({ message }: { message: string }) {
     return (
-        <div className="glass-card border-red-500/30">
-            <div className="flex items-center gap-3">
-                <span className="text-2xl">⚠️</span>
-                <div>
-                    <h3 className="font-semibold text-red-400">Error</h3>
-                    <p className="text-white/70 text-sm">{message}</p>
+        <div className="glass-card border-red-500/40 bg-red-950/20">
+            <div className="flex items-start gap-3">
+                <span className="text-2xl" aria-hidden>⚠️</span>
+                <div className="min-w-0">
+                    <h3 className="font-semibold text-red-300">Error</h3>
+                    <p className="mt-1 text-sm text-white/85">{message}</p>
                 </div>
             </div>
         </div>
@@ -31,15 +31,23 @@ export function PageHeader({
     badge?: string;
 }) {
     return (
-        <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold gradient-text">{title}</h1>
-                {badge && <span className="badge badge-blue">{badge}</span>}
+        <header className="mb-8">
+            <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                    <h1 className="min-w-0 max-w-full break-words text-2xl font-bold gradient-text sm:text-3xl">
+                        {title}
+                    </h1>
+                    {badge && (
+                        <span className="badge badge-blue shrink-0">{badge}</span>
+                    )}
+                </div>
+                {subtitle && (
+                    <p className="mt-3 max-w-4xl text-[15px] leading-relaxed text-white/80">
+                        {subtitle}
+                    </p>
+                )}
             </div>
-            {subtitle && (
-                <p className="text-white/60">{subtitle}</p>
-            )}
-        </div>
+        </header>
     );
 }
 
@@ -47,22 +55,30 @@ export function StatCard({
     label,
     value,
     subValue,
-    trend
+    trend,
+    valueClassName,
 }: {
     label: string;
     value: string | number;
     subValue?: string;
     trend?: 'up' | 'down' | 'neutral';
+    /** Overrides trend-based coloring when set */
+    valueClassName?: string;
 }) {
+    const trendClass =
+        trend === 'up'
+            ? 'text-emerald-400'
+            : trend === 'down'
+              ? 'text-red-400'
+              : 'text-white';
+
     return (
-        <div className="glass-card">
-            <div className="text-sm text-white/50 mb-1">{label}</div>
-            <div className={`text-2xl font-bold ${trend === 'up' ? 'text-green-400' :
-                    trend === 'down' ? 'text-red-400' : ''
-                }`}>
+        <div className="glass-card flex min-h-[104px] flex-col justify-center">
+            <div className="mb-1 text-sm text-white/65">{label}</div>
+            <div className={`text-2xl font-bold tabular-nums ${valueClassName ?? trendClass}`}>
                 {value}
             </div>
-            {subValue && <div className="text-xs text-white/40 mt-1">{subValue}</div>}
+            {subValue && <div className="mt-1 text-xs text-white/55">{subValue}</div>}
         </div>
     );
 }
