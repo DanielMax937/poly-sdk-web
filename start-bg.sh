@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-PORT="${PORT:-3010}"
+PORT="${PORT:-3020}"
 APP_NAME="poly-sdk-web"
 
 # Ensure pm2 is available (local or global)

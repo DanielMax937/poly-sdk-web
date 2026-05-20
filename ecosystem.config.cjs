@@ -7,7 +7,7 @@ module.exports = {
       args: ['run', 'dev'],
       cwd: __dirname,
       env: {
-        PORT: process.env.PORT || 3010,
+        PORT: process.env.PORT || 3020,
         NODE_OPTIONS: '--dns-result-order=ipv4first',
       },
       log_date_format: 'YYYY-MM-DD HH:mm:ss',

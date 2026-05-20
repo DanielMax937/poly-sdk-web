@@ -11,7 +11,7 @@ elif [ -f "./node_modules/.bin/pm2" ]; then
   PM2="./node_modules/.bin/pm2"
 else
   echo "PM2 not found. Trying fallback (port kill)..."
-  PORT="${PORT:-3010}"
+  PORT="${PORT:-3020}"
   if PID=$(lsof -ti:"$PORT" 2>/dev/null); then
     echo "Stopping process on port $PORT (PID: $PID)..."
     echo "$PID" | xargs kill 2>/dev/null || true

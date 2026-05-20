@@ -1,14 +1,14 @@
 /**
  * Playwright script: Visit poly-sdk-web pages, take screenshots, verify fixes.
  * Run: npx tsx scripts/verify-ui-screenshot.ts
- * Requires: service running at BASE_URL (default http://127.0.0.1:3010)
+ * Requires: service running at BASE_URL (default http://127.0.0.1:3020)
  */
 
 import { chromium } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:3010';
+const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:3020';
 const SCREENSHOT_DIR = path.join(process.cwd(), 'screenshots');
 
 async function main() {
